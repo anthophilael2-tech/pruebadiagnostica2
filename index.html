@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protocolo de Ubicación Diagnóstica Virtual en 5 Minutos</title>
+<!--
+  =====================================================================
+  PROTOCOLO DE UBICACIÓN DIAGNÓSTICA VIRTUAL EN 5 MINUTOS
+  Diseño y Adaptación Psicoeducativa: Psicólogo José M. Granda Cortez
+
+  Archivo único, autocontenido (HTML5 + CSS3 + Vanilla JS, sin librerías).
+
+  MEJORAS INTEGRADAS EN ESTA VERSIÓN
+   1. Andamiaje de inicio: conteo regresivo 3-2-1-¡A leer! (animado y sonoro).
+   2. Persistencia: botón «Guardar Perfil de Lectura» -> localStorage
+      (clave: perfil_lector_usuario = Explorador | Detective | Cazador).
+   3. Herramientas DUA: tamaño de letra A+/A-, fondos pastel y Modo Tranquilo.
+   4. Pre-entrenamiento de vocabulario (Mayer): 3 tarjetas «Palabras Clave».
+   5. PDF exportable con marco decorativo, tabla de métricas, árbol de
+      decisión y firma/créditos del autor.
+  =====================================================================
+-->
+<style>
+/* =====================================================================
+   1. VARIABLES DE TEMA
+   ===================================================================== */
+:root{
+  --bg:#FAFAFA; --surface:#FFFFFF; --text:#1F2933; --muted:#5B6773; --line:#D5DBE1;
+  --accent:#2F5D8C; --err:#E53935; --omi:#FB8C00; --vac:#FDD835; --cut:#1E6FD9;
+  --ok:#2E7D32; --bad:#C62828;
+  --read:1;                     /* DUA: factor de tamaño de letra del cuadro de lectura */
+}
+body.night{ --bg:#1E2530; --surface:#273140; --text:#E8ECF1; --muted:#A9B4C2; --line:#3A475A; --accent:#8FB8E8; }
+
+/* DUA: fondos pastel (se ignoran en modo nocturno; el JS los hace excluyentes) */
+body[data-paper="crema"]:not(.night){ --bg:#FFF8E7; --surface:#FFF8E7; }
+body[data-paper="menta"]:not(.night){ --bg:#E9F7EF; --surface:#E9F7EF; }
+body[data-paper="cielo"]:not(.night){ --bg:#EAF4FF; --surface:#EAF4FF; }
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:OpenDyslexic,Verdana,Arial,sans-serif;min-height:100vh;transition:background .25s}
+button{font:inherit;cursor:pointer}
+button:focus-visible,.w:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.hidden{display:none !important}
+
+/* =====================================================================
+   2. BARRA SUPERIOR + HERRAMIENTAS DUA
+   ===================================================================== */
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.top h1{font-size:1rem;margin:0;font-weight:700}
+.seg{display:inline-flex;border:2px solid var(--accent);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--accent);padding:10px 18px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+body.night .seg button[aria-pressed="true"]{color:#14202E}
+.tools{display:flex;gap:10px;align-items:center}
+.ghost{border:1px solid var(--line);background:transparent;color:var(--text);padding:9px 14px;border-radius:8px}
+.ghost[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+body.night .ghost[aria-pressed="true"]{color:#14202E}
+.ghost:disabled{opacity:.45;cursor:not-allowed}
+
+/* Fila de accesibilidad DUA */
+.dua{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;padding-top:10px;border-top:1px dashed var(--line)}
+.dgrp{display:flex;align-items:center;gap:8px}
+.dlabel{font-size:.85rem;font-weight:700;color:var(--muted)}
+#fontVal{min-width:3.8ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.sw{width:36px;height:36px;border-radius:50%;border:2px solid #7A8794;padding:0}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 6px var(--accent)}
+
+/* =====================================================================
+   3. MODO EVALUADOR
+   ===================================================================== */
+#evaluator{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,1fr);gap:20px;padding:20px;max-width:1400px;margin:0 auto}
+@media (max-width:900px){#evaluator{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.card h3{margin:0 0 12px;font-size:1.05rem}
+.timer{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+#startBtn{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:16px 26px;font-size:1.2rem;font-weight:700}
+body.night #startBtn{color:#14202E}
+#startBtn:disabled{opacity:.55;cursor:not-allowed}
+#clock{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums;min-width:4.2ch}
+#clock.end{color:var(--err)}
+.bar{flex:1 1 160px;height:14px;border-radius:7px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;background:var(--accent);transition:width .25s linear}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.85rem;color:var(--muted);margin:14px 0}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1px solid var(--line)}
+.legend .l1::before{background:var(--surface)} .legend .l2::before{background:var(--err)}
+.legend .l3::before{background:var(--omi)} .legend .l4::before{background:var(--vac)}
+.legend .l5::before{border:2px solid var(--cut)}
+.line{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.lnum{flex:0 0 2.6rem;color:var(--muted);font-size:.85rem}
+/* DUA: el tamaño de letra del cuadro de lectura escala con --read */
+.words{flex:1;display:flex;flex-wrap:wrap;gap:6px 4px;font-size:calc(1.3rem * var(--read));line-height:1.8}
+.w{position:relative;border:2px solid transparent;border-radius:6px;padding:0 6px;background:transparent;color:var(--text);font:inherit;cursor:pointer;user-select:none}
+.w sup{font-size:.55em;color:var(--muted);margin-left:2px}
+.w:hover{background:rgba(127,127,127,.15)}
+.w.s1{background:var(--err);color:#fff}
+.w.s2{background:var(--omi);color:#1F2933}
+.w.s3{background:var(--vac);color:#1F2933}
+.w.s4{border-color:var(--cut);box-shadow:0 0 0 2px rgba(30,111,217,.25)}
+.w.s4::after{content:"]";color:var(--cut);font-weight:700;margin-left:2px}
+.w.s1 sup,.w.s2 sup,.w.s3 sup{color:inherit}
+.tot{flex:0 0 5.5rem;text-align:right;font-weight:700;color:var(--accent)}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.q{padding:12px 0;border-bottom:1px solid var(--line)}
+.q:last-child{border-bottom:0}
+.q p{margin:0 0 4px}.q small{color:var(--muted)}
+.qb{display:flex;gap:8px;margin-top:10px}
+.qb button{flex:1;padding:10px;border-radius:8px;border:2px solid var(--line);background:transparent;color:var(--text);font-weight:700}
+.qb .yes[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.qb .no[aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:#fff}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:1.7rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.82rem;color:var(--muted)}
+#result{margin-top:14px;border-radius:12px;padding:16px;border:3px solid var(--line)}
+#result h4{margin:0 0 6px;font-size:1.2rem}
+#result p{margin:0}
+#result.r1{border-color:var(--err);background:rgba(229,57,53,.10)}
+#result.r2{border-color:#E0A800;background:rgba(253,216,53,.18)}
+#result.r3{border-color:var(--ok);background:rgba(46,125,50,.12)}
+
+/* Mensajes de estado del guardado de perfil */
+.smsg{margin:8px 0 0;font-size:.92rem;font-weight:700;color:var(--ok);min-height:1.2em}
+.smsg.bad{color:var(--bad)}
+body.night .smsg{color:#81C784}
+body.night .smsg.bad{color:#EF9A9A}
+#manualSave{margin-top:12px}
+
+/* =====================================================================
+   4. MODO AUTOMÁTICO (VOZ)
+   ===================================================================== */
+#auto{max-width:960px;margin:0 auto;padding:28px 24px 80px}
+.sc{display:none}.sc.on{display:block}
+#auto h2{font-size:30px;margin:0 0 18px}
+.ins{font-size:22px;line-height:1.7;margin:0 0 16px}
+.badge{display:inline-block;padding:8px 16px;border-radius:20px;border:2px solid var(--line);font-weight:700}
+.badge.ok{border-color:var(--ok);color:var(--ok)}.badge.bad{border-color:var(--bad);color:var(--bad)}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+.go{display:block;width:100%;margin-top:12px;background:var(--accent);color:#fff;border:0;border-radius:16px;padding:22px;font-size:1.6rem;font-weight:700}
+body.night .go{color:#14202E}
+.go:disabled{opacity:.45;cursor:not-allowed}
+@media (prefers-reduced-motion:no-preference){.go:not(:disabled){animation:pulse 1.8s ease-in-out infinite}}
+@keyframes pulse{50%{transform:scale(1.025)}}
+#aClock{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums;min-width:4.2ch}
+/* DUA: texto de lectura escalable */
+#aText h3{font-size:calc(32px * var(--read));margin:18px 0}
+#aText p{font-size:calc(26px * var(--read));line-height:1.9;margin:0 0 22px}
+.aw{padding:0 3px;border-radius:6px;border:2px solid transparent;color:var(--text)}
+.aw.ok{background:#C6F6D5;color:#1F2933}.aw.err{background:#FED7D7;color:#1F2933}
+.aw.omi{background:#FEEBC8;color:#1F2933}.aw.vac{background:#FEF08A;color:#1F2933}
+.aw.cur{border-bottom:4px solid var(--accent)}
+.aw.cut{border-color:var(--cut)}.aw.cut::after{content:"]";color:var(--cut);font-weight:700}
+#qStat{color:var(--muted);font-size:1.1rem}
+#aResult{margin:16px 0;border-radius:12px;padding:16px;border:3px solid var(--line)}
+#aResult h4{margin:0 0 6px;font-size:1.3rem}#aResult p{margin:0}
+#aResult.r1{border-color:var(--err);background:rgba(229,57,53,.10)}
+#aResult.r2{border-color:#E0A800;background:rgba(253,216,53,.18)}
+#aResult.r3{border-color:var(--ok);background:rgba(46,125,50,.12)}
+
+/* ---------- Pantalla de bienvenida ---------- */
+#sc0{font-family:"Trebuchet MS",Verdana,sans-serif}
+.wel{background:#FFF6E3;border:3px solid #D9BC8C;border-radius:32px;padding:34px 26px 32px;max-width:1060px;margin:0 auto;text-align:center}
+.wel-main{display:flex;gap:30px;align-items:center;justify-content:center;flex-wrap:wrap}
+.fig{flex:0 1 340px;width:340px;max-width:100%}
+.fig img,.fig svg{width:100%;height:auto;aspect-ratio:1/1;display:block;object-fit:cover}
+.bubble{position:relative;flex:1 1 340px;background:#fff;border:3px solid #F2B63D;border-radius:28px;padding:22px 26px}
+.bubble::before{content:"";position:absolute;left:-17px;top:50%;width:28px;height:28px;background:#fff;border-left:3px solid #F2B63D;border-bottom:3px solid #F2B63D;transform:translateY(-50%) rotate(45deg)}
+@media (max-width:820px){.bubble::before{display:none}}
+#sc0 .bubble h2{font-size:2.4rem;margin:0 0 8px;color:#1F5A80}
+#sc0 .bubble p{font-size:1.25rem;line-height:1.55;margin:10px 0;color:#2B3A4A}
+#sc0 .bubble .sub{font-weight:700;font-size:1.4rem}
+#sc0 .bubble .can{font-weight:700;color:#1F5A80}
+.pill{margin-top:24px;background:#2C3E50;color:#fff;border:0;border-radius:999px;padding:18px 46px;font:700 1.5rem "Trebuchet MS",Verdana,sans-serif}
+.pill:hover{background:#1F2D3A}
+.wtools{margin-top:18px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:center;color:#5A4A2E;font-size:.95rem}
+.wbtn,.wtools select{background:#fff;color:#2B3A4A;border:2px solid #D9BC8C;border-radius:10px;padding:8px 12px;font:inherit}
+.mic{font-size:1.3rem;padding:16px 28px;border:2px solid var(--accent);font-weight:700}
+
+/* ---------- Ficha de pre-entrenamiento de vocabulario (Mayer) ---------- */
+.vocab{margin:18px 0 8px;padding:18px 18px 20px;border:3px dashed var(--accent);border-radius:20px;background:var(--surface)}
+.vocab h3{margin:0 0 4px;font-size:1.6rem;color:var(--accent)}
+.vsub{margin:0 0 14px;font-size:1.1rem;color:var(--muted);line-height:1.5}
+.vgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.vcard{display:flex;flex-direction:column;align-items:center;text-align:center;background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:12px 12px 14px}
+.vcard svg{width:100%;max-width:190px;height:auto;border-radius:12px}
+.vword{margin:10px 0 4px;font-size:1.6rem;color:var(--accent);letter-spacing:.02em}
+.vdef{margin:0 0 6px;font-size:1.1rem;line-height:1.5}
+.vex{margin:0 0 10px;font-size:.98rem;line-height:1.45;color:var(--muted)}
+.vsay{margin-top:auto;background:var(--surface);color:var(--text);border:2px solid var(--accent);border-radius:999px;padding:9px 18px;font-weight:700}
+.vsay:hover{background:var(--accent);color:#fff}
+body.night .vsay:hover{color:#14202E}
+
+/* ---------- Conteo regresivo 3-2-1 (andamiaje de inicio) ---------- */
+.count{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);text-align:center;padding:20px}
+.count p{margin:0 0 6px;font-size:1.6rem;font-weight:700;color:var(--muted)}
+.cnum{font-size:min(38vw,14rem);font-weight:800;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.cnum.pop{animation:cpop .9s ease-out both}
+@keyframes cpop{0%{transform:scale(.4);opacity:0}30%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:.92}}
+/* Fase final «¡A leer!»: el texto ya está visible debajo y no bloquea la lectura */
+.count.final{background:transparent;pointer-events:none}
+.count.final p{display:none}
+.count.final .cnum{font-size:min(14vw,5rem);background:var(--accent);color:#fff;border-radius:40px;padding:.12em .55em;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+body.night .count.final .cnum{color:#14202E}
+@media (prefers-reduced-motion:reduce){.cnum.pop{animation:none}}
+
+/* ---------- Cuestionario dialógico PEEP (pantalla 3) ---------- */
+#auto.wide{max-width:1360px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.qtop{display:flex;justify-content:flex-end;margin-bottom:14px}
+.stars{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:3px solid #F2B63D;border-radius:999px;padding:6px 20px;font:700 28px Verdana,sans-serif;color:var(--text);font-variant-numeric:tabular-nums}
+.stars .si{font-size:30px}
+.stars.bump{animation:bump .8s ease-out}
+@keyframes bump{0%{transform:scale(1)}35%{transform:scale(1.3) rotate(-5deg)}100%{transform:scale(1)}}
+.qgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:900px){.qgrid{grid-template-columns:1fr}}
+.story h3{font-size:1.3rem;margin:0 0 14px}
+#storyTxt p{margin:0;font-size:calc(24px * var(--read));line-height:2;font-family:OpenDyslexic,Verdana,Arial,sans-serif}
+/* Pista visual nivel 1: fondo amarillo suave + pulso sutil (se detiene tras unos ciclos) */
+.resaltado-pista{background:#FEFCBF;color:#1F2933;border-radius:6px;padding:2px 4px;-webkit-box-decoration-break:clone;box-decoration-break:clone;animation:pista 1.6s ease-in-out 4}
+@keyframes pista{50%{box-shadow:0 0 0 7px rgba(246,224,94,.6)}}
+.qcard{font-family:OpenDyslexic,Verdana,Arial,sans-serif}
+.qnum{margin:0;font-size:1.1rem;font-weight:700;color:var(--muted)}
+#auto .qtext{font-size:calc(24px * var(--read));line-height:1.5;margin:8px 0 14px;font-weight:700;outline:0}
+.rep{font-size:1.05rem;padding:10px 16px;margin-bottom:6px}
+.qopt{display:flex;align-items:center;gap:14px;width:100%;min-height:60px;margin:12px 0;padding:14px 18px;text-align:left;font-family:inherit;font-size:calc(22px * var(--read));line-height:1.35;color:var(--text);background:var(--surface);border:3px solid var(--accent);border-radius:16px;transition:background .2s,opacity .2s}
+.qopt:hover:not(:disabled){background:rgba(47,93,140,.1)}
+.qopt .let{flex:0 0 auto;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700}
+body.night .qopt .let{color:#14202E}
+.qopt:disabled{cursor:default}
+.qopt:disabled:not(.ok):not(.dim){opacity:.55}
+.qopt.dim{opacity:.3;pointer-events:none}                                  /* Nivel 2: descarte parcial */
+.qopt.modelo,.qopt.ok{background:#C6F6D5;color:#1F2933;border-color:#2E7D32}  /* Nivel 3 / acierto */
+.qopt.nudge{animation:nudge .4s}
+@keyframes nudge{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+#qStat{min-height:1.5em;margin:6px 0 0;font-size:1.05rem;color:var(--muted)}
+#qFeed{margin-top:10px;font-size:calc(21px * var(--read));line-height:1.6}
+#qFeed p{margin:0 0 10px}
+#qFeed .exp{background:rgba(46,125,50,.12);border-left:6px solid var(--ok);border-radius:10px;padding:12px 16px}
+#qFeed .pra{font-weight:700;color:var(--ok)}
+body.night #qFeed .pra{color:#81C784}
+#starRain{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:45}
+#starRain span{position:absolute;top:-60px;animation:fall 2.2s ease-in forwards}
+@keyframes fall{to{transform:translateY(115vh) rotate(240deg)}}
+@media (prefers-reduced-motion:reduce){.resaltado-pista,.stars.bump,.qopt.nudge{animation:none}}
+body.calm .resaltado-pista,body.calm .stars.bump,body.calm .qopt.nudge{animation:none}
+
+/* ---------- Pantalla final del alumno ---------- */
+.fin{text-align:center;padding:50px 10px}
+.fin .trophy{font-size:96px;line-height:1}
+#auto .fin h2{font-size:2.6rem;margin:18px 0}
+.save{background:var(--accent);color:#fff;border:0;border-radius:16px;padding:16px 28px;font-size:1.25rem;font-weight:700}
+body.night .save{color:#14202E}
+.save:disabled{opacity:.5;cursor:not-allowed}
+.saveBox{margin:10px 0 0}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50;display:none}
+.fld{display:block;margin:10px 0;font-size:.9rem;color:var(--muted)}
+.fld input{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit;margin-top:4px}
+.task{max-width:640px;margin:26px auto 0;text-align:left;background:var(--surface);border:3px solid var(--accent);border-radius:20px;padding:22px 26px}
+.task h3{margin:0 0 10px;font-size:1.5rem}
+.task ol{font-size:1.2rem;line-height:1.8;margin:0 0 6px;padding-left:1.4rem}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.acts .ghost{flex:1 1 auto}
+
+/* ---------- MODO TRANQUILO: sin animaciones decorativas ---------- */
+body.calm .go,body.calm .go:not(:disabled){animation:none}
+body.calm .cnum.pop{animation:none}
+</style>
+</head>
+<body>
+
+<!-- =====================================================================
+     BARRA SUPERIOR: modos, tema y herramientas DUA
+     ===================================================================== -->
+<header class="top">
+  <h1>Protocolo de Ubicación Diagnóstica · 5 min</h1>
+  <div class="seg" role="group" aria-label="Cambiar modo de vista">
+    <button id="btnAuto" aria-pressed="true">Modo Automático (voz)</button>
+    <button id="btnEval" aria-pressed="false">Modo Evaluador</button>
+  </div>
+  <div class="tools">
+    <button class="ghost" id="btnNight" aria-pressed="false">Modo nocturno</button>
+    <button class="ghost" id="btnReset">Reiniciar Evaluación</button>
+  </div>
+
+  <!-- Herramientas DUA (Diseño Universal para el Aprendizaje) -->
+  <div class="dua" role="toolbar" aria-label="Herramientas de accesibilidad">
+    <div class="dgrp" role="group" aria-label="Tamaño de letra del cuadro de lectura">
+      <span class="dlabel">Letra</span>
+      <button class="ghost" id="btnFontDown" type="button" aria-label="Disminuir tamaño de letra">A-</button>
+      <output id="fontVal" for="btnFontDown btnFontUp" aria-live="polite">100%</output>
+      <button class="ghost" id="btnFontUp" type="button" aria-label="Aumentar tamaño de letra"><b>A+</b></button>
+    </div>
+    <div class="dgrp" role="group" aria-label="Color de fondo">
+      <span class="dlabel">Fondo</span>
+      <button class="sw" type="button" data-paper="none"  aria-pressed="true"  aria-label="Fondo predeterminado" title="Predeterminado" style="background:#FFFFFF"></button>
+      <button class="sw" type="button" data-paper="crema" aria-pressed="false" aria-label="Fondo crema" title="Crema" style="background:#FFF8E7"></button>
+      <button class="sw" type="button" data-paper="menta" aria-pressed="false" aria-label="Fondo menta" title="Menta" style="background:#E9F7EF"></button>
+      <button class="sw" type="button" data-paper="cielo" aria-pressed="false" aria-label="Fondo cielo" title="Cielo" style="background:#EAF4FF"></button>
+    </div>
+    <div class="dgrp">
+      <button class="ghost" id="btnCalm" type="button" aria-pressed="false" title="Silencia los efectos de sonido y desactiva el confeti">🌿 Modo Tranquilo</button>
+    </div>
+  </div>
+</header>
+
+<!-- =====================================================================
+     MODO AUTOMÁTICO (RECONOCIMIENTO DE VOZ)
+     ===================================================================== -->
+<main id="auto">
+  <!-- Pantalla 0: bienvenida -->
+  <section class="sc on" id="sc0">
+    <div class="wel">
+      <div class="wel-main">
+        <div class="fig">
+          <img src="bienvenida.png" alt="Ilustración de bienvenida" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <svg viewBox="0 0 200 200" style="display:none" role="img" aria-label="Libro abierto con estrellas">
+            <rect width="200" height="200" rx="10" fill="#FFE3A3"/>
+            <path d="M100 70c-20-14-48-14-68-4v82c20-10 48-10 68 4z" fill="#fff" stroke="#2C3E50" stroke-width="5" stroke-linejoin="round"/>
+            <path d="M100 70c20-14 48-14 68-4v82c-20-10-48-10-68 4z" fill="#F7F3EA" stroke="#2C3E50" stroke-width="5" stroke-linejoin="round"/>
+            <path d="M100 70v82" stroke="#2C3E50" stroke-width="5"/>
+            <path d="M50 92h36M50 108h36M114 92h36M114 108h36" stroke="#9FB6C8" stroke-width="5" stroke-linecap="round"/>
+            <path d="M100 18l7 14 15 2-11 11 3 15-14-8-14 8 3-15-11-11 15-2z" fill="#F2B63D" stroke="#2C3E50" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="34" cy="40" r="5" fill="#F2B63D"/><circle cx="168" cy="44" r="4" fill="#4FA3C7"/><circle cx="172" cy="176" r="5" fill="#F2B63D"/>
+          </svg>
+        </div>
+        <div class="bubble">
+          <h2>Hola explorador 👋</h2>
+          <p class="sub">Bienvenido a nuestra primera lectura.</p>
+          <p>El día de hoy la actividad solo va a durar cinco minutos. 🕔</p>
+          <p>Esta lectura permitirá conocerte y saber si eres un explorador, un detective o un cazador. 🔎</p>
+        </div>
+      </div>
+      <button class="pill" id="btnInd">Indicaciones</button>
+      <div class="wtools"><button class="wbtn" id="btnHear" type="button">🔊 Escuchar bienvenida</button></div>
+    </div>
+  </section>
+
+  <!-- Pantalla 1: prueba de micrófono -> confirmación -> estudio de palabras clave -->
+  <section class="sc" id="sc1">
+    <h2>¡Hola! Vamos a leer juntos</h2>
+    <p class="ins"><b>Prueba de Voz:</b> «Haz clic en el botón para probar el micrófono y di “Hola”.»</p>
+    <div class="row"><button class="ghost mic" id="btnMic">🎤 Probar micrófono</button></div>
+    <p><span id="micStatus" class="badge" role="status" aria-live="polite">🎤 Micrófono sin probar</span></p>
+
+    <!-- Aparece solo cuando el micrófono quedó confirmado -->
+    <div id="stepWords" class="hidden">
+      <p class="ins" id="insLect"><b>Palabras Clave:</b> «A continuación estudiaremos tres palabras que serán de ayuda para entender el texto. Cuando hayas terminado de leerlas, haz clic para pasar a las indicaciones.»</p>
+
+    <!-- Principio de pre-entrenamiento (Mayer): se presentan las palabras clave
+           con imagen + palabra + definición + audio ANTES de la lectura.
+           Es opcional y no consume tiempo de la prueba. -->
+      <section class="vocab" aria-labelledby="vocTitle">
+        <h3 id="vocTitle">🔑 Palabras Clave</h3>
+        <p class="vsub">Lee estas 3 palabras de la historia. Si quieres, toca 🔊 para escucharlas.</p>
+        <ul class="vgrid" id="vocGrid">
+
+          <li class="vcard">
+            <!-- Ilustración: salvavidas sobre el agua -->
+            <svg viewBox="0 0 120 90" aria-hidden="true" focusable="false">
+              <rect width="120" height="90" rx="10" fill="#DCEFFB"/>
+              <circle cx="60" cy="44" r="28" fill="#E53935"/>
+              <circle cx="60" cy="44" r="12" fill="#DCEFFB"/>
+              <path d="M60 16v16M60 56v16M32 44h16M72 44h16" stroke="#FFFFFF" stroke-width="9"/>
+              <path d="M0 64q15-9 30 0t30 0 30 0 30 0v26H0z" fill="#8EC5E8"/>
+            </svg>
+            <h4 class="vword">rescatar</h4>
+            <p class="vdef">Salvar a alguien o algo de un peligro.</p>
+            <p class="vex"><i>Ejemplo:</i> El bombero rescata a una persona.</p>
+            <button type="button" class="vsay" data-key="vocab_rescatar" data-say="Rescatar. Rescatar significa salvar a alguien o algo de un peligro. Por ejemplo: el bombero rescata a una persona." aria-label="Escuchar la palabra rescatar">🔊 Escuchar</button>
+          </li>
+
+          <li class="vcard">
+            <!-- Ilustración: manta con rayas y flecos -->
+            <svg viewBox="0 0 120 90" aria-hidden="true" focusable="false">
+              <rect width="120" height="90" rx="10" fill="#FDEBD0"/>
+              <rect x="16" y="22" width="88" height="48" rx="4" fill="#7FB3D5"/>
+              <path d="M16 38h88M16 54h88M44 22v48M72 22v48" stroke="#FFFFFF" stroke-width="4" opacity=".85"/>
+              <path d="M80 22h24v22z" fill="#A9CCE3"/>
+              <path d="M10 26h6M10 32h6M10 38h6M10 44h6M10 50h6M10 56h6M10 62h6M104 26h6M104 32h6M104 38h6M104 44h6M104 50h6M104 56h6M104 62h6" stroke="#5499C7" stroke-width="2.5"/>
+            </svg>
+            <h4 class="vword">manta</h4>
+            <p class="vdef">Tela gruesa y suave que sirve para abrigar o envolver.</p>
+            <p class="vex"><i>Ejemplo:</i> En la noche fría me tapo con una manta.</p>
+            <button type="button" class="vsay" data-key="vocab_manta" data-say="Manta. Una manta es una tela gruesa y suave que sirve para abrigar o envolver. Por ejemplo: en la noche fría me tapo con una manta." aria-label="Escuchar la palabra manta">🔊 Escuchar</button>
+          </li>
+
+          <li class="vcard">
+            <!-- Ilustración: señal de piso mojado y charco -->
+            <svg viewBox="0 0 120 90" aria-hidden="true" focusable="false">
+              <rect width="120" height="90" rx="10" fill="#EAF2F8"/>
+              <ellipse cx="60" cy="74" rx="44" ry="9" fill="#8EC5E8"/>
+              <path d="M60 12L92 68H28Z" fill="#FDD835" stroke="#1F2933" stroke-width="4" stroke-linejoin="round"/>
+              <path d="M60 28c8 11 11 17 11 22a11 11 0 0 1-22 0c0-5 3-11 11-22z" fill="#1E6FD9"/>
+            </svg>
+            <h4 class="vword">resbaloso</h4>
+            <p class="vdef">Que hace que los pies se deslicen fácilmente, porque está mojado o liso.</p>
+            <p class="vex"><i>Ejemplo:</i> El piso mojado está resbaloso.</p>
+            <button type="button" class="vsay" data-key="vocab_resbaloso" data-say="Resbaloso. Algo resbaloso hace que los pies se deslicen fácilmente, porque está mojado o liso. Por ejemplo: el piso mojado está resbaloso." aria-label="Escuchar la palabra resbaloso">🔊 Escuchar</button>
+          </li>
+        </ul>
+      </section>
+
+      <button class="go" id="btnGo" disabled>👉 Haz clic aquí para pasar a las indicaciones</button>
+    </div>
+  </section>
+
+  <!-- Pantalla 2: indicaciones (el botón se bloquea hasta que terminan de darse) + conteo + lectura -->
+  <section class="sc" id="sc2">
+    <div id="aReady">
+      <h2>Indicaciones</h2>
+      <p class="ins" id="insInd"><b>Indicaciones:</b> «Primero habrá un conteo: 3, 2, 1. Después empezará a correr el tiempo y tu voz se grabará. Cuando aparezca “¡A leer!”, empieza a leer.»</p>
+      <p><span id="indStat" class="badge" role="status" aria-live="polite">🔊 Escucha las indicaciones…</span></p>
+      <button class="go" id="btnReady" disabled>¡LISTO!</button>
+    </div>
+
+    <!-- Andamiaje de inicio: conteo regresivo (pantalla completa mientras dura) -->
+    <div id="aCount" class="count hidden" role="status" aria-live="assertive">
+      <p id="cTxt">Prepárate para leer</p>
+      <div id="cNum" class="cnum" aria-atomic="true"></div>
+    </div>
+
+    <div id="aRun" class="hidden">
+      <div class="timer"><div id="aClock">60</div><div class="bar" aria-hidden="true"><i id="aBar"></i></div></div>
+      <div id="aText"></div>
+    </div>
+  </section>
+
+  <!-- Pantalla 3: comprensión -->
+  <section class="sc" id="sc3">
+    <!-- Contador de estrellas (arriba a la derecha) -->
+    <div class="qtop">
+      <div class="stars" id="starBox" role="status" aria-live="polite">
+        <span class="si" aria-hidden="true">⭐</span><span id="starNum">0</span><span class="sr"> estrellas</span>
+      </div>
+    </div>
+    <div class="qgrid">
+      <!-- Columna izquierda: cuento completo (aquí se aplica .resaltado-pista) -->
+      <article class="card story" aria-labelledby="storyH">
+        <h3 id="storyH">📖 El rescate del gatito</h3>
+        <div id="storyTxt"></div>
+      </article>
+      <!-- Columna derecha: tarjeta de la pregunta activa -->
+      <section class="card qcard" aria-labelledby="qTitle">
+        <p class="qnum" id="qNum"></p>
+        <h2 id="qTitle" class="qtext" tabindex="-1"></h2>
+        <button class="ghost rep" id="btnRepeat" type="button">🔊 Escuchar otra vez</button>
+        <div id="qOpts" role="group" aria-label="Opciones de respuesta"></div>
+        <p id="qStat" role="status" aria-live="polite"></p>
+        <div id="qFeed" aria-live="polite"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- Pantalla 4: cierre del alumno (sin mostrar resultados) -->
+  <section class="sc" id="sc4">
+    <div class="fin">
+      <div class="trophy" aria-hidden="true">🎉</div>
+      <h2>¡Bien, terminamos la misión!</h2>
+      <p class="ins">¡Lo hiciste muy bien! Gracias por leer conmigo. 🌟</p>
+      <p class="ins" id="finStarsP">⭐ Ganaste <b id="finStars">0</b> de <b id="finMax">8</b> estrellas</p>
+      <button class="go" id="btnStory" type="button">Siguiente fase: Story Mapping →</button>
+      <p id="storyMsg" class="smsg" role="status" aria-live="polite"></p>
+
+      <!-- Persistencia del perfil (el alumno no ve el nivel; solo se confirma el guardado) -->
+      <div class="saveBox">
+        <button class="save" id="btnSaveStu" type="button">💾 Guardar Perfil de Lectura</button>
+        <p id="saveStuMsg" class="smsg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div id="taskBox" class="task hidden">
+        <h3>📌 Ahora entrega tu tarea</h3>
+        <ol>
+          <li>Haz clic en el botón <b>Modo Evaluador</b>.</li>
+          <li>Escribe tu nombre y descarga tu <b>archivo de audio</b> (⬇ Grabación de voz).</li>
+          <li>Descarga tus <b>resultados en PDF</b> (⬇ Descargar PDF).</li>
+          <li>Sube ambos archivos a la <b>tarea de tu aula virtual</b>.</li>
+        </ol>
+        <button class="go" id="btnToEval" type="button">Ir al Modo Evaluador →</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- =====================================================================
+     MODO EVALUADOR
+     ===================================================================== -->
+<main id="evaluator" class="hidden">
+  <section class="card">
+    <div class="timer">
+      <button id="startBtn">▶ Iniciar Prueba (60s)</button>
+      <div id="clock" aria-live="off">60</div>
+      <div class="bar" aria-hidden="true"><i id="barFill"></i></div>
+    </div>
+    <div class="legend">
+      <span class="l1">Normal</span><span class="l2">Error / Mala pronunciación</span>
+      <span class="l3">Omisión</span><span class="l4">Vacilación &gt; 3s</span>
+      <span class="l5">ÚLTIMA PALABRA LEÍDA (corte 60s)</span>
+    </div>
+    <p style="margin:0 0 8px;color:var(--muted);font-size:.9rem">Clic en una palabra para cambiar su marca: Normal → Error → Omisión → Vacilación → Última palabra → Normal.</p>
+    <div id="lines"></div>
+  </section>
+
+  <aside class="sidebar">
+    <!-- Resultado de la prueba automática -->
+    <section class="card" id="autoRep">
+      <h3>Resultado de la prueba automática (solo evaluador)</h3>
+      <p id="repEmpty" style="color:var(--muted);margin:0">Aún no hay una prueba automática completada. Al terminar, el resultado aparecerá aquí y no se muestra al estudiante.</p>
+      <div id="repBody" class="hidden">
+        <div class="stats">
+          <div class="stat"><b id="rPI">0</b><span>Palabras Intentadas (PI)</span></div>
+          <div class="stat"><b id="rE">0</b><span>E</span></div>
+          <div class="stat"><b id="rPCPM">0</b><span>PCPM = PI − E</span></div>
+          <div class="stat"><b id="rAcc">0%</b><span>% Precisión</span></div>
+        </div>
+        <div id="aResult" role="status"></div>
+        <label class="fld">Nombre del estudiante (opcional)<input id="stuName" type="text"></label>
+        <label class="fld">Correo del evaluador<input id="evalMail" type="email" placeholder="evaluador@correo.com"></label>
+        <div class="acts">
+          <button class="ghost" id="btnSaveAuto" type="button">💾 Guardar Perfil de Lectura</button>
+          <button class="ghost" id="btnMail">✉ Enviar por correo</button>
+          <button class="ghost" id="btnPdf">⬇ Descargar PDF</button>
+          <button class="ghost hidden" id="btnRec">⬇ Grabación de voz</button>
+        </div>
+        <p id="saveAutoMsg" class="smsg" role="status" aria-live="polite"></p>
+        <small style="color:var(--muted)">El correo se abre en tu programa de correo con el resultado escrito. Para entregar la tarea, descarga el PDF y la grabación de voz y súbelos a tu aula virtual.</small>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Comprobación de comprensión (Hiperlexia Check · 4 preguntas PEEP)</h3>
+      <div class="q" data-q="0">
+        <p>1. ¿A quién encontró Lucas bajo el puente de madera?</p>
+        <small>Esperado: A un pequeño gatito gris</small>
+        <div class="qb"><button class="yes" aria-pressed="false">Correcto</button><button class="no" aria-pressed="false">Incorrecto</button></div>
+      </div>
+      <div class="q" data-q="1">
+        <p>2. ¿Por qué Lucas no pudo agarrar al gatito solo con el brazo?</p>
+        <small>Esperado: Porque el puente estaba muy resbaloso y el agua subía</small>
+        <div class="qb"><button class="yes" aria-pressed="false">Correcto</button><button class="no" aria-pressed="false">Incorrecto</button></div>
+      </div>
+      <div class="q" data-q="2">
+        <p>3. ¿Qué objeto sacó Lucas de su mochila para salvar al gatito?</p>
+        <small>Esperado: Una manta gruesa</small>
+        <div class="qb"><button class="yes" aria-pressed="false">Correcto</button><button class="no" aria-pressed="false">Incorrecto</button></div>
+      </div>
+      <div class="q" data-q="3">
+        <p>4. Al final, Lucas secó al gatito y le dio leche tibia. ¿Cómo crees que se sintió el gatito al llegar a la casa?</p>
+        <small>Esperado: Se sintió seguro, aliviado y feliz</small>
+        <div class="qb"><button class="yes" aria-pressed="false">Correcto</button><button class="no" aria-pressed="false">Incorrecto</button></div>
+      </div>
+    </section>
+
+    <!-- Calculadora manual en tiempo real -->
+    <section class="card">
+      <h3>Calculadora en tiempo real</h3>
+      <div class="stats">
+        <div class="stat"><b id="sPI">0</b><span>Palabras Intentadas (PI)</span></div>
+        <div class="stat"><b id="sE">0</b><span>E</span></div>
+        <div class="stat"><b id="sPCPM">0</b><span>PCPM = PI − E</span></div>
+        <div class="stat"><b id="sAcc">0%</b><span>Precisión = (PCPM / PI) × 100</span></div>
+      </div>
+      <div id="result" class="hidden" role="status"></div>
+      <div id="manualSave" class="hidden">
+        <button class="ghost" id="btnSaveManual" type="button">💾 Guardar Perfil de Lectura</button>
+        <p id="saveManualMsg" class="smsg" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div id="starRain" aria-hidden="true"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  // =====================================================================
+  // A. PREFERENCIAS DUA Y SONIDO (módulo base: lo usan las demás secciones)
+  // =====================================================================
+  const DUA_KEY     = "dua_prefs_lectura";        // preferencias visuales/sonoras del usuario
+  const PROFILE_KEY = "perfil_lector_usuario";    // perfil diagnóstico compartido con el ecosistema
+  const SIZE_MIN = 0.8, SIZE_MAX = 1.8, SIZE_STEP = 0.1;
+
+  const DUA = { size: 1, paper: "none", calm: false };
+
+  // localStorage puede estar bloqueado (navegación privada, políticas); todo va protegido.
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+
+  (function loadDua() {
+    try {
+      const s = JSON.parse(lsGet(DUA_KEY) || "null");
+      if (!s) return;
+      if (typeof s.size === "number") DUA.size = Math.min(SIZE_MAX, Math.max(SIZE_MIN, s.size));
+      if (["none", "crema", "menta", "cielo"].includes(s.paper)) DUA.paper = s.paper;
+      DUA.calm = !!s.calm;
+    } catch (e) { /* preferencias corruptas: se ignoran */ }
+  })();
+
+  // ---- Efectos sonoros (todos respetan el Modo Tranquilo) ----
+  let audioCtx = null;
+  function ensureAudio() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) { /* sin audio disponible */ }
+  }
+  function tone(freq, dur, vol) {
+    if (DUA.calm) return;                      // Modo Tranquilo: silencio total de efectos
+    try {
+      ensureAudio();
+      const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* sin audio disponible */ }
+  }
+  const beep = () => tone(660, 1.0, 0.18);     // aviso de fin de los 60 s en el evaluador
+
+  // =====================================================================
+  // B. DATOS DEL TEXTO (12 líneas, numeración acumulada)
+  // =====================================================================
+  const LINES = [
+    "Un día de lluvia, Lucas escuchó un maullido débil bajo",
+    "el puente de madera. Se acercó despacio y vio a",
+    "un pequeño gatito gris asustado y mojado.",
+    "El agua del río comenzaba a subir y el",
+    "gatito no podía salir solo. Lucas intentó alcanzarlo",
+    "con el brazo, pero el puente estaba muy",
+    "resbaloso. Entonces, recordó que llevaba una manta",
+    "gruesa en su mochila. La extendió con cuidado",
+    "hasta el suelo. El gatito caminó sobre la",
+    "manta y Lucas lo cargó con suavidad. Lo",
+    "llevó a casa, lo secó con una toalla",
+    "y le dio leche tibia. El gatito ronroneó feliz."
+  ].map(l => l.split(" "));
+
+  const TOTALS = [10,20,27,36,44,52,59,67,75,83,91,100];
+  const STATES = 5; // 0 normal, 1 error, 2 omisión, 3 vacilación, 4 última palabra
+  const DURATION = 60;
+
+  const marks = new Array(100).fill(0);
+  const comp = [null, null, null, null]; // true / false / null (una entrada por pregunta PEEP)
+
+  // ---------- Render del texto interactivo (modo evaluador) ----------
+  const linesEl = $("lines");
+  let n = 0;
+  LINES.forEach((words, li) => {
+    const row = document.createElement("div");
+    row.className = "line";
+    row.innerHTML = '<span class="lnum">L' + (li + 1) + '</span>';
+    const wrap = document.createElement("div");
+    wrap.className = "words";
+    words.forEach(txt => {
+      n++;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "w";
+      b.dataset.i = n;
+      b.innerHTML = txt + "<sup>(" + n + ")</sup>";
+      b.setAttribute("aria-label", "Palabra " + n + ": " + txt);
+      wrap.appendChild(b);
+    });
+    row.appendChild(wrap);
+    const tot = document.createElement("span");
+    tot.className = "tot";
+    tot.textContent = "[Total: " + TOTALS[li] + "]";
+    row.appendChild(tot);
+    linesEl.appendChild(row);
+  });
+  if (n !== 100) console.warn("El texto no suma 100 palabras:", n);
+
+  linesEl.addEventListener("click", e => {
+    const b = e.target.closest(".w");
+    if (!b) return;
+    const i = +b.dataset.i;
+    const next = (marks[i - 1] + 1) % STATES;
+    if (next === 4) {
+      // solo una palabra puede ser la última leída
+      marks.forEach((m, k) => { if (m === 4) marks[k] = 0; });
+    }
+    marks[i - 1] = next;
+    paintMarks();
+    calc();
+  });
+
+  function paintMarks() {
+    document.querySelectorAll(".w").forEach(b => {
+      b.className = "w" + (marks[b.dataset.i - 1] ? " s" + marks[b.dataset.i - 1] : "");
+    });
+  }
+
+  // ---------- Comprensión ----------
+  document.querySelectorAll(".q").forEach(q => {
+    const idx = +q.dataset.q;
+    const yes = q.querySelector(".yes"), no = q.querySelector(".no");
+    function set(v) {
+      comp[idx] = comp[idx] === v ? null : v;
+      yes.setAttribute("aria-pressed", comp[idx] === true);
+      no.setAttribute("aria-pressed", comp[idx] === false);
+      calc();
+    }
+    yes.addEventListener("click", () => set(true));
+    no.addEventListener("click", () => set(false));
+  });
+
+  // =====================================================================
+  // C. ÁRBOL DE DECISIÓN, PERFILES Y CALCULADORA MANUAL
+  // =====================================================================
+  // Devuelve la clasificación completa, incluido el «perfil» que se persiste.
+  function classify(acc, allOk) {
+    let cls, t, m, perfil, nivel;
+    if (acc < 85) {
+      cls = "r1"; perfil = "Explorador"; nivel = 1;
+      t = "🔴 NIVEL 1 · EXPLORADOR";
+      m = "Nivel de Frustración detectado. Asignar Nivel 1 Explorador (40-70 palabras, tarjetas SUR 1-2 palabras).";
+    } else if (acc > 95 && allOk) {
+      cls = "r3"; perfil = "Cazador"; nivel = 3;
+      t = "🟢 NIVEL 3 · CAZADOR";
+      m = "Nivel Independiente. Asignar Nivel 3 Cazador (150-180 palabras, complejidad avanzada).";
+    } else {
+      cls = "r2"; perfil = "Detective"; nivel = 2;
+      t = "🟡 NIVEL 2 · DETECTIVE";
+      m = "Nivel Instruccional Ideal. Asignar Nivel 2 Detective (100-140 palabras, tarjetas SUR 2-3 palabras).";
+      if (acc > 95) m += " (Precisión > 95%: para Nivel 3 las 4 preguntas de comprensión deben estar marcadas como Correctas al primer intento, sin ayudas.)";
+    }
+    return { cls, t, m, perfil, nivel, html: "<h4>" + t + "</h4><p>" + m + "</p>" };
+  }
+
+  let manualPerfil = null; // perfil actual de la calculadora manual
+
+  function calc() {
+    const cut = marks.indexOf(4);
+    const PI = cut === -1 ? 0 : cut + 1;
+    let E = 0;
+    const limit = PI === 0 ? 100 : PI;
+    for (let k = 0; k < limit; k++) if (marks[k] >= 1 && marks[k] <= 3) E++;
+    const PCPM = Math.max(PI - E, 0);
+    const acc = PI > 0 ? (PCPM / PI) * 100 : 0;
+
+    $("sPI").textContent = PI;
+    $("sE").textContent = E;
+    $("sPCPM").textContent = PCPM;
+    $("sAcc").textContent = (Math.round(acc * 10) / 10) + "%";
+
+    const r = $("result");
+    setMsg($("saveManualMsg"), "");            // el resultado cambió: se limpia el aviso anterior
+    if (PI === 0) {
+      r.className = "hidden"; r.innerHTML = "";
+      manualPerfil = null; $("manualSave").classList.add("hidden");
+      return;
+    }
+    const c = classify(acc, comp.every(v => v === true));
+    r.className = c.cls;
+    r.innerHTML = c.html;
+    manualPerfil = c.perfil;
+    $("manualSave").classList.remove("hidden");
+  }
+
+  // =====================================================================
+  // D. PERSISTENCIA DEL PERFIL (localStorage)
+  // =====================================================================
+  function setMsg(el, txt, ok) {
+    el.textContent = txt;
+    el.classList.toggle("bad", ok === false);
+  }
+
+  // Guarda 'Explorador' | 'Detective' | 'Cazador' bajo la clave perfil_lector_usuario.
+  // Las demás aplicaciones del ecosistema (mismo origen/dispositivo) la leen con:
+  //    localStorage.getItem("perfil_lector_usuario")
+  function saveProfile(perfil, msgEl, revealName) {
+    if (!perfil) { setMsg(msgEl, "Aún no hay un perfil que guardar.", false); return; }
+    if (lsSet(PROFILE_KEY, perfil)) {
+      setMsg(msgEl, revealName
+        ? "✔ Perfil «" + perfil + "» guardado en este dispositivo. Las demás aplicaciones de lectura lo usarán automáticamente."
+        : "✔ ¡Listo! Tu perfil de lectura quedó guardado. Tus próximas actividades se ajustarán a ti. 🌟");
+    } else {
+      setMsg(msgEl, "No se pudo guardar: el navegador bloquea el almacenamiento local.", false);
+    }
+  }
+
+  $("btnSaveManual").addEventListener("click", () => saveProfile(manualPerfil, $("saveManualMsg"), true));
+  $("btnSaveAuto").addEventListener("click", () => saveProfile(A.rep && A.rep.cl ? A.rep.cl.perfil : null, $("saveAutoMsg"), true));
+  $("btnSaveStu").addEventListener("click", () => saveProfile(A.rep && A.rep.cl ? A.rep.cl.perfil : null, $("saveStuMsg"), false));
+
+  // =====================================================================
+  // E. CRONÓMETRO DEL MODO EVALUADOR
+  // =====================================================================
+  let remaining = DURATION, tick = null;
+  const clock = $("clock"), fill = $("barFill"), startBtn = $("startBtn");
+
+  function drawClock() {
+    clock.textContent = remaining;
+    clock.classList.toggle("end", remaining === 0);
+    fill.style.width = (remaining / DURATION * 100) + "%";
+  }
+
+  startBtn.addEventListener("click", () => {
+    if (tick) return;
+    ensureAudio();
+    remaining = DURATION; drawClock();
+    startBtn.disabled = true;
+    startBtn.textContent = "⏱ Prueba en curso…";
+    tick = setInterval(() => {
+      remaining--;
+      drawClock();
+      if (remaining <= 0) {
+        clearInterval(tick); tick = null;
+        beep();
+        startBtn.textContent = "Tiempo terminado: marca la ÚLTIMA PALABRA LEÍDA";
+      }
+    }, 1000);
+  });
+
+  function resetTimer() {
+    clearInterval(tick); tick = null;
+    remaining = DURATION; drawClock();
+    startBtn.disabled = false;
+    startBtn.textContent = "▶ Iniciar Prueba (60s)";
+  }
+
+  // ---------- Reiniciar ----------
+  $("btnReset").addEventListener("click", () => {
+    marks.fill(0); comp.fill(null);
+    document.querySelectorAll(".qb button").forEach(b => b.setAttribute("aria-pressed", "false"));
+    paintMarks(); resetTimer(); calc(); resetAuto();
+  });
+
+  // =====================================================================
+  // F. CONMUTADOR DE VISTA, MODO NOCTURNO Y HERRAMIENTAS DUA
+  // =====================================================================
+  function setView(mode) {
+    const map = { eval: ["evaluator", "btnEval"], auto: ["auto", "btnAuto"] };
+    Object.keys(map).forEach(k => {
+      $(map[k][0]).classList.toggle("hidden", k !== mode);
+      $(map[k][1]).setAttribute("aria-pressed", k === mode);
+    });
+    stopAll();
+    if (mode === "auto") { resetAuto(true); speak(WELCOME, null, "bienvenida"); }
+  }
+  $("btnEval").addEventListener("click", () => setView("eval"));
+  $("btnAuto").addEventListener("click", () => setView("auto"));
+
+  function setNight(on) {
+    document.body.classList.toggle("night", on);
+    const b = $("btnNight");
+    b.setAttribute("aria-pressed", on);
+    b.textContent = on ? "Modo diurno" : "Modo nocturno";
+  }
+  $("btnNight").addEventListener("click", () => {
+    const on = !document.body.classList.contains("night");
+    if (on && DUA.paper !== "none") { DUA.paper = "none"; applyDua(true); } // noche y fondo pastel son excluyentes
+    setNight(on);
+  });
+
+  // Aplica las preferencias DUA a la interfaz y (opcionalmente) las guarda.
+  function applyDua(save) {
+    document.documentElement.style.setProperty("--read", DUA.size.toFixed(2));
+    $("fontVal").textContent = Math.round(DUA.size * 100) + "%";
+    $("btnFontDown").disabled = DUA.size <= SIZE_MIN + 0.001;
+    $("btnFontUp").disabled = DUA.size >= SIZE_MAX - 0.001;
+
+    document.body.dataset.paper = DUA.paper;
+    document.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", b.dataset.paper === DUA.paper));
+
+    document.body.classList.toggle("calm", DUA.calm);
+    $("btnCalm").setAttribute("aria-pressed", DUA.calm);
+    $("btnCalm").textContent = DUA.calm ? "🌿 Modo Tranquilo: activado" : "🌿 Modo Tranquilo";
+
+    if (save) lsSet(DUA_KEY, JSON.stringify(DUA));
+  }
+
+  function changeSize(delta) {
+    DUA.size = Math.round(Math.min(SIZE_MAX, Math.max(SIZE_MIN, DUA.size + delta)) * 10) / 10;
+    applyDua(true);
+  }
+  $("btnFontDown").addEventListener("click", () => changeSize(-SIZE_STEP));
+  $("btnFontUp").addEventListener("click", () => changeSize(SIZE_STEP));
+
+  document.querySelectorAll(".sw").forEach(b => b.addEventListener("click", () => {
+    DUA.paper = b.dataset.paper;
+    if (DUA.paper !== "none") setNight(false);
+    applyDua(true);
+  }));
+
+  $("btnCalm").addEventListener("click", () => {
+    DUA.calm = !DUA.calm;
+    if (DUA.calm) { A.celebrating = false; }   // corta el confeti si estaba corriendo
+    applyDua(true);
+  });
+
+  // =====================================================================
+  // G. MODO AUTOMÁTICO: Web Speech API (reconocimiento + síntesis de voz)
+  // =====================================================================
+  const WORDS = LINES.flat();
+  const NORM = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  const TGT = WORDS.map(NORM);
+  const BREAKS = [27, 70, 100]; // fin de párrafo 1, 2 y 3
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const MICTXT = "Haz clic en el botón para probar el micrófono y di Hola.";
+  const MICOK = "¡Muy bien! Micrófono listo.";
+  const PALABRAS = "A continuación estudiaremos tres palabras que serán de ayuda para entender el texto. Cuando hayas terminado de leerlas, haz clic para pasar a las indicaciones.";
+  const INDIC = "Primero habrá un conteo: tres, dos, uno. Después empezará a correr el tiempo y tu voz se grabará. Cuando aparezca ¡A leer!, empieza a leer.";
+  const QINTRO = "¡Muy bien leído! Ahora te haré cuatro preguntas. Escucha con atención y toca la respuesta que creas correcta. Si necesitas ayuda, te daré pistas. ¡Después terminamos!";
+  const WELCOME = "Hola explorador, bienvenido a nuestra primera lectura. El día de hoy la actividad solo va a durar cinco minutos. Esta lectura permitirá conocerte y saber si eres un explorador, un detective o un cazador.";
+  const TAREA = "Ahora entra al Modo Evaluador, descarga tu archivo de audio y tus resultados en PDF, y súbelos a la tarea de tu aula virtual.";
+  // =====================================================================
+  // CUESTIONARIO DIALÓGICO PEEP (Prompt · Evaluate · Expand · Praise)
+  // con andamiaje de menor a mayor ayuda (Least-to-Most) y preguntas CROWD.
+  // =====================================================================
+  const IDLE_MS = 6000;                 // inactividad (ms) que se interpreta como duda
+  const STORY_MAPPING_URL = "";         // ← pon aquí la URL de la siguiente fase (Story Mapping)
+
+  // Texto de referencia (se muestra completo en la columna izquierda)
+  const CUENTO = "Un día de lluvia, Lucas escuchó un maullido débil bajo el puente de madera. Se acercó despacio y vio a un pequeño gatito gris asustado y mojado. El agua del río comenzaba a subir y el gatito no podía salir solo. Lucas intentó alcanzarlo con el brazo, pero el puente estaba muy resbaloso. Entonces, recordó que llevaba una manta gruesa en su mochila. La extendió con cuidado hasta el suelo. El gatito caminó sobre la manta y Lucas lo cargó con suavidad. Lo llevó a casa, lo secó con una toalla y le dio leche tibia. El gatito ronroneó feliz.";
+
+  const PREGUNTAS = [
+    {
+      id: 1,
+      tipo: "Literal / WH (Inicio)",
+      prompt: "¿A quién encontró Lucas bajo el puente de madera?",
+      opciones: [
+        { id: "A", texto: "A un perro grande", correcta: false },
+        { id: "B", texto: "A un pequeño gatito gris", correcta: true },
+        { id: "C", texto: "A un pato mojado", correcta: false }
+      ],
+      andamiaje: {
+        texto_resaltar: "vio a un pequeño gatito gris asustado y mojado.",
+        descarte_id: "A",
+        pista_voz: "No era un perro. Recuerda que Lucas escuchó un maullido débil. ¿Era un gatito o un pato?",
+        modelo_voz: "Lucas encontró a un pequeño gatito gris. Selecciónalo en tu pantalla."
+      },
+      expansion: "¡Exacto! Lucas escuchó un maullido débil bajo la lluvia y vio al gatito gris que estaba asustado y mojado.",
+      elogio: "¡Gran atención a los personajes de la historia!"
+    },
+    {
+      id: 2,
+      tipo: "Inferencial Causal / WH (Nudo)",
+      prompt: "¿Por qué Lucas no pudo agarrar al gatito solo con el brazo?",
+      opciones: [
+        { id: "A", texto: "Porque el puente estaba muy resbaloso y el agua subía", correcta: true },
+        { id: "B", texto: "Porque no quería mojarse la ropa", correcta: false },
+        { id: "C", texto: "Porque el gatito salió corriendo", correcta: false }
+      ],
+      andamiaje: {
+        texto_resaltar: "Lucas intentó alcanzarlo con el brazo, pero el puente estaba muy resbaloso.",
+        descarte_id: "C",
+        pista_voz: "El gatito no podía salir solo. Piensa en el piso de madera mojado por la lluvia: ¿por qué era peligroso estirarse?",
+        modelo_voz: "No pudo alcanzarlo porque el puente estaba muy resbaloso. Marca esa opción."
+      },
+      expansion: "¡Muy bien deducido! El piso de madera estaba resbaloso por la lluvia y si se estiraba demasiado podía caerse al río.",
+      elogio: "¡Excelente razonamiento sobre el problema de Lucas!"
+    },
+    {
+      id: 3,
+      tipo: "Solución de Problemas / WH (Desenlace)",
+      prompt: "¿Qué objeto sacó Lucas de su mochila para salvar al gatito?",
+      opciones: [
+        { id: "A", texto: "Una cuerda azul", correcta: false },
+        { id: "B", texto: "Una manta gruesa", correcta: true },
+        { id: "C", texto: "Un paraguas grande", correcta: false }
+      ],
+      andamiaje: {
+        texto_resaltar: "recordó que llevaba una manta gruesa en su mochila. La extendió con cuidado hasta el suelo.",
+        descarte_id: "A",
+        pista_voz: "Lucas no llevaba cuerdas. ¿Qué prenda gruesa y suave tenía en la mochila para que el gatito caminara?",
+        modelo_voz: "Usó una manta gruesa. Elige la opción de la manta."
+      },
+      expansion: "¡Correcto! Lucas extendió su manta gruesa hasta el suelo para que el gatito caminara seguro y pudiera cargarlo con suavidad.",
+      elogio: "¡Fantástico! Recordaste con mucha precisión cómo solucionaron el rescate."
+    },
+    {
+      id: 4,
+      tipo: "Distanciamiento y Emociones (Reflexiva)",
+      prompt: "Al final, Lucas secó al gatito y le dio leche tibia. ¿Cómo crees que se sintió el gatito al llegar a la casa?",
+      opciones: [
+        { id: "A", texto: "Se sintió seguro, aliviado y feliz", correcta: true },
+        { id: "B", texto: "Estaba enojado y con ganas de volver a la lluvia", correcta: false },
+        { id: "C", texto: "Tenía miedo de Lucas", correcta: false }
+      ],
+      andamiaje: {
+        texto_resaltar: "El gatito ronroneó feliz.",
+        descarte_id: "B",
+        pista_voz: "Los gatitos ronronean cuando están cómodos y cuidados. ¿Se sentía seguro y feliz o enojado?",
+        modelo_voz: "El gatito se sintió seguro, cuidado y muy feliz. Selecciónalo."
+      },
+      expansion: "¡Exacto! El gatito pasó de estar asustado y empapado bajo el puente a sentirse abrigado y con la pancita llena, por eso empezó a ronronear.",
+      elogio: "¡Qué gran empatía tienes con los animales! Has completado todo el cuestionario."
+    }
+  ];
+  const A = { st: [], p: 0, rec: null, reading: false, t: null, last: 0, speaking: false, vac: -1, qi: 0, ans: [null, null, null, null], help: [0, 0, 0, 0], stars: 0, qtok: 0, idle: null, nx: null, Q: null, used: {}, PI: 0, end: 0, sid: 0, audio: null, rep: null, blob: null, mr: null, keepRec: false, chunks: [], micOk: false, micEnd: 0, micErr: false, celebrating: false, cd: null, counting: false, pend: null, tail: null, heard: 0, flush: false };
+
+  function lev(a, b) {
+    const d = [...Array(b.length + 1).keys()];
+    for (let i = 1; i <= a.length; i++) {
+      let prev = d[0]; d[0] = i;
+      for (let j = 1; j <= b.length; j++) {
+        const t = d[j];
+        d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+        prev = t;
+      }
+    }
+    return d[b.length];
+  }
+  // Coincidencia tolerante: el reconocedor de voz suele alterar una letra (o dos en palabras largas) al oír lectura rápida.
+  const same = (a, b) => a === b || (a.length >= 5 && b.length >= 5 && lev(a, b) <= (a.length >= 9 && b.length >= 9 ? 2 : 1));
+
+  // ---- Grabación de la voz del alumno (para el evaluador) ----
+  function startRecording() {
+    A.blob = null; A.chunks = []; A.keepRec = false;
+    if (!navigator.mediaDevices || !window.MediaRecorder) return;
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(st => {
+      const mr = new MediaRecorder(st); A.mr = mr;
+      mr.ondataavailable = e => { if (e.data.size) A.chunks.push(e.data); };
+      mr.onstop = () => {
+        st.getTracks().forEach(t => t.stop());
+        if (A.keepRec) { A.blob = new Blob(A.chunks, { type: mr.mimeType || "audio/webm" }); renderReport(); }
+      };
+      mr.start();
+    }).catch(() => {});
+  }
+  function stopRecording() {
+    const mr = A.mr; A.mr = null;
+    if (mr && mr.state !== "inactive") { try { mr.stop(); } catch (e) {} }
+  }
+
+  function screen(k) {
+    for (let i = 0; i <= 4; i++) $("sc" + i).classList.toggle("on", i === k);
+    $("auto").classList.toggle("wide", k === 3);          // el cuestionario usa dos columnas: más ancho
+  }
+
+  // ---- Voz humana primero: audio/<clave>.mp3. Solo si ese archivo no existe se usa la voz sintética del dispositivo ----
+  let VOICES = [];
+  function fillVoices() { if (window.speechSynthesis) VOICES = speechSynthesis.getVoices(); }
+  if (window.speechSynthesis) { fillVoices(); speechSynthesis.onvoiceschanged = fillVoices; }
+
+  function pickVoice() {
+    const es = VOICES.filter(v => /^es/i.test(v.lang));
+    let best = null, bs = -1;
+    es.forEach(v => {
+      const nm = v.name.toLowerCase(); let sc = 0;
+      if (/natural|neural|online/.test(nm)) sc += 100;
+      if (/premium|enhanced|siri/.test(nm)) sc += 60;
+      if (/google/.test(nm)) sc += 40;
+      if (/es[-_]pe/i.test(v.lang)) sc += 15; else if (/es[-_](us|mx|419|co|ar|cl)/i.test(v.lang)) sc += 12; else if (/es[-_]es/i.test(v.lang)) sc += 8;
+      if (!v.localService) sc += 5;
+      if (sc > bs) { bs = sc; best = v; }
+    });
+    return best;
+  }
+
+  function stopSpeech() {
+    A.sid++;
+    if (A.audio) { A.audio.pause(); A.audio = null; }
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    A.speaking = false;
+  }
+
+  function speak(txt, cb, key) {
+    stopSpeech();
+    const id = A.sid; A.speaking = true;
+    let fin = false;
+    const done = () => { if (fin || id !== A.sid) return; fin = true; A.speaking = false; A.last = Date.now(); cb && cb(); };
+    const tts = () => {
+      if (id !== A.sid) return;
+      if (!window.speechSynthesis) { done(); return; }
+      const v = pickVoice();
+      const parts = txt.split(/(?<=[.!?])\s+/).filter(Boolean); // frases cortas = ritmo más natural
+      parts.forEach((t, i) => {
+        const u = new SpeechSynthesisUtterance(t);
+        if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "es-ES";
+        u.rate = 0.92; u.pitch = 1;
+        if (i === parts.length - 1) { u.onend = done; u.onerror = done; }
+        speechSynthesis.speak(u);
+      });
+    };
+    if (key) {
+      const au = new Audio("audio/" + key + ".mp3"); A.audio = au;
+      let fb = false;
+      const f = () => { if (fb) return; fb = true; A.audio = null; tts(); };
+      au.onended = done; au.onerror = f;
+      au.play().catch(f);
+    } else tts();
+  }
+
+  function mkRec(cont) {
+    const r = new SR();
+    r.lang = "es-PE"; r.continuous = cont; r.interimResults = cont; r.maxAlternatives = 1;
+    return r;
+  }
+  function stopRec() {
+    if (A.rec) { A.rec.onend = null; A.rec.onerror = null; try { A.rec.abort(); } catch (e) {} A.rec = null; }
+  }
+  function stopAll() {
+    A.reading = false; A.celebrating = false; clearInterval(A.t); A.t = null; stopRec(); stopRecording();
+    A.qtok++; clearTimeout(A.idle); clearTimeout(A.nx); $("starRain").innerHTML = "";   // corta el cuestionario si estaba en curso
+    // Cancela y oculta el conteo regresivo si estaba en curso
+    clearTimeout(A.cd); A.cd = null; A.counting = false; $("aCount").classList.add("hidden");
+    stopSpeech();
+  }
+
+  // ---- Pantalla 1: prueba de micrófono (15 s para hacer clic y decir «Hola»; recién después se leen las indicaciones) ----
+  function micMsg(t, cls) { const m = $("micStatus"); m.textContent = t; m.className = "badge " + (cls || ""); }
+  function micOk() {
+    if (A.micOk) return;
+    A.micOk = true; stopRec();
+    micMsg("🎤 ¡Muy bien! Micrófono listo ✔", "ok");     // confirmación visible
+    speak(MICOK, () => {                                  // confirmación hablada
+      if (!$("sc1").classList.contains("on")) return;
+      $("stepWords").classList.remove("hidden");          // luego: estudio de las 3 palabras clave
+      speak(PALABRAS, () => { $("btnGo").disabled = false; }, "palabras");
+    }, "microfono_ok");
+  }
+  $("btnMic").addEventListener("click", () => {
+    if (!SR) { micMsg("Tu navegador no admite reconocimiento de voz. Usa Chrome o Edge.", "bad"); return; }
+    stopRec(); stopSpeech();
+    $("stepWords").classList.add("hidden"); $("btnGo").disabled = true;
+    A.micOk = false; A.micErr = false; A.micEnd = Date.now() + 15000;
+    micMsg("🎤 Te escucho… di «Hola» (tienes 15 segundos)");
+    const go = () => {
+      const r = mkRec(true); A.rec = r;
+      r.onresult = e => {
+        for (let i = e.resultIndex; i < e.results.length; i++)
+          if (NORM(e.results[i][0].transcript).includes("hola")) { micOk(); return; }
+      };
+      r.onerror = e => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") { A.micErr = true; micMsg("Permite el uso del micrófono en el navegador.", "bad"); }
+      };
+      r.onend = () => {
+        if (A.micOk || A.micErr) return;
+        if (Date.now() < A.micEnd) { try { go(); } catch (x) {} }
+        else micMsg("No te escuché. Haz clic en el botón para intentar otra vez.", "bad");
+      };
+      r.start();
+    };
+    go();
+  });
+
+  // ---- Pantalla 2: ficha de vocabulario (audio opcional) ----
+  $("vocGrid").addEventListener("click", e => {
+    const b = e.target.closest(".vsay");
+    if (!b) return;
+    $("btnGo").disabled = false;                 // si tocó un audio, ya está estudiando las palabras
+    speak(b.dataset.say, null, b.dataset.key);   // audio/vocab_*.mp3 si existe; si no, voz sintética
+  });
+
+  // ---- Pantalla 2: lectura cronometrada ----
+  function renderText() {
+    let h = '<p>';
+    WORDS.forEach((w, i) => {
+      h += '<span class="aw" id="aw' + i + '">' + w + '</span> ';
+      if (BREAKS.includes(i + 1)) h += '</p>' + (i + 1 < 100 ? '<p>' : '');
+    });
+    $("aText").innerHTML = h;
+  }
+  function paint() {
+    for (let i = 0; i < 100; i++) {
+      const el = $("aw" + i);
+      let c = "aw" + (A.st[i] ? " " + A.st[i] : "");
+      if (A.reading && i === A.p) c += " cur";
+      if (!A.reading && A.PI > 0 && i === A.PI - 1) c += " cut";
+      el.className = c;
+    }
+  }
+
+  // Pasa a las indicaciones: el botón ¡LISTO! queda BLOQUEADO hasta que termina de darse la instrucción.
+  $("btnGo").addEventListener("click", () => {
+    stopAll();
+    $("aReady").classList.remove("hidden"); $("aRun").classList.add("hidden");
+    $("btnReady").disabled = true;
+    $("indStat").textContent = "🔊 Escucha las indicaciones…"; $("indStat").className = "badge";
+    screen(2);
+    let unlocked = false;
+    const unlock = () => {
+      if (unlocked) return; unlocked = true;
+      $("btnReady").disabled = false;
+      $("indStat").textContent = "✔ Ya puedes empezar"; $("indStat").className = "badge ok";
+    };
+    speak(INDIC, unlock, "indicaciones");
+    setTimeout(() => { if ($("sc2").classList.contains("on")) unlock(); }, 30000); // seguro por si la voz falla
+  });
+
+  // ---- Andamiaje de inicio: conteo regresivo 3-2-1-¡A leer! ----
+  // Se ejecuta ANTES de abrir el micrófono y de arrancar el cronómetro de 60 s.
+  // Es animado (CSS), sonoro (tonos ascendentes; silenciados en Modo Tranquilo)
+  // y accesible (región aria-live="assertive" para lectores de pantalla).
+  function runCountdown(done) {
+    const box = $("aCount"), num = $("cNum");
+    const TONES = { 3: 440, 2: 523, 1: 659 };      // do-sol… escala ascendente
+    let k = 3;
+    box.classList.remove("hidden", "final");
+    $("cTxt").textContent = "Prepárate para leer";
+
+    const show = txt => {                           // reinicia la animación en cada número
+      num.className = "cnum"; void num.offsetWidth; num.className = "cnum pop";
+      num.textContent = txt;
+    };
+    const step = () => {
+      if (!A.counting) return;                      // cancelado (reinicio, cambio de modo…)
+      if (k > 0) {
+        show(k); tone(TONES[k], 0.28, 0.16);
+        k--; A.cd = setTimeout(step, 1000);
+      } else {
+        A.counting = false;
+        box.classList.add("final");                 // el texto ya queda visible debajo
+        show("¡A leer!"); tone(880, 0.7, 0.2);
+        done();                                     // AHORA empieza micrófono + cronómetro
+        A.cd = setTimeout(() => box.classList.add("hidden"), 900);
+      }
+    };
+    step();
+  }
+
+  $("btnReady").addEventListener("click", () => {
+    stopAll();
+    ensureAudio();                                  // el clic desbloquea el audio del navegador
+    $("aReady").classList.add("hidden"); $("aRun").classList.add("hidden");
+    A.counting = true;
+    runCountdown(beginReading);
+  });
+
+  // Inicio real de la lectura (se llama al terminar el conteo)
+  function beginReading() {
+    A.st = new Array(100).fill(0); A.p = 0; A.vac = -1; A.PI = 0; A.pend = null; A.tail = null; A.heard = Date.now();
+    $("aRun").classList.remove("hidden");
+    $("aClock").textContent = "60"; $("aBar").style.width = "100%";
+    renderText();
+    A.reading = true; A.last = Date.now(); A.end = Date.now() + 60000;
+    paint(); startRecording(); startRec();
+    A.t = setInterval(tickA, 250);
+  }
+
+  function startRec() {
+    if (!A.reading || !SR) return;
+    const r = mkRec(true); A.rec = r; A.used = {}; A.tail = null;
+    r.onresult = onRes;
+    r.onspeechstart = () => { A.heard = Date.now(); };   // hay voz: no es una vacilación aunque el reconocedor tarde
+    r.onend = () => { if (A.reading) { try { startRec(); } catch (e) {} } };
+    r.start();
+  }
+
+  function onRes(e) {
+    if (A.speaking || !A.reading) return;
+    A.heard = Date.now();
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      const ws = res[0].transcript.split(/\s+/).map(NORM).filter(Boolean);
+      const upto = res.isFinal ? ws.length : ws.length - 1; // la última palabra provisional es inestable
+      let c = A.used[i] || 0;
+      for (; c < upto; c++) feed(ws[c]);
+      A.used[i] = c;
+      // Se recuerda la última palabra provisional: si termina el tiempo, se evalúa igualmente
+      if (res.isFinal) { if (A.tail && A.tail.i === i) A.tail = null; }
+      else if (ws.length) A.tail = { i, pos: ws.length - 1, w: ws[ws.length - 1] };
+    }
+  }
+
+  // Recibe cada palabra oída. Una palabra que no calza NO se marca error de inmediato:
+  // queda «pendiente» hasta ver la siguiente (así el ruido o una palabra de más no cuenta como error).
+  function feed(w) {
+    if (A.p >= 100 || !A.reading) return;
+    A.last = Date.now();
+    if (A.pend !== null) {
+      A.pend = null;
+      if (!same(w, TGT[A.p])) { A.st[A.p] = "err"; A.p++; }   // era una sustitución / mala pronunciación
+      // si w coincide con la palabra esperada, lo pendiente era ruido y se descarta
+      if (A.p >= 100) { endIfDone(); return; }
+    }
+    match(w);
+  }
+
+  function match(w) {
+    const p = A.p;
+    if (p > 0 && w === TGT[p - 1] && w !== TGT[p]) return;     // repetición de la palabra anterior
+    if (same(w, TGT[p])) { A.st[p] = A.vac === p ? "vac" : "ok"; A.p++; }
+    else {
+      // Lectura rápida: el reconocedor entrega palabras pegadas («delrio» = del + rio)
+      let joined = false;
+      if (w.length >= 4) {
+        for (let n = 2; n <= 3 && p + n <= 100 && !joined; n++) {
+          if (same(w, TGT.slice(p, p + n).join(""))) {
+            for (let j = p; j < p + n; j++) A.st[j] = "ok";
+            A.p = p + n; joined = true;
+          }
+        }
+      }
+      if (!joined) {
+        // Omisión: la palabra oída está más adelante (ventana corta para palabras de 1-2 letras)
+        const win = w.length >= 3 ? 4 : 2; let k = -1;
+        for (let j = p + 1; j <= p + win && j < 100; j++) if (same(w, TGT[j])) { k = j; break; }
+        if (k > -1) { for (let j = p; j < k; j++) A.st[j] = "omi"; A.st[k] = "ok"; A.p = k + 1; }
+        else A.pend = w;                                         // sin resolver: se decide con la palabra siguiente
+      }
+    }
+    endIfDone();
+  }
+
+  function endIfDone() { paint(); if (A.p >= 100 && !A.flush) finishRead(); }
+
+  // Al terminar el tiempo se evalúa lo que el reconocedor aún tenía pendiente
+  function flushTail() {
+    const t = A.tail;
+    if (t && (A.used[t.i] || 0) <= t.pos) { A.used[t.i] = t.pos + 1; feed(t.w); }
+    A.pend = null; A.tail = null;     // lo ambiguo al cortar el tiempo se descarta (beneficio de la duda)
+  }
+
+  function tickA() {
+    const left = Math.max(0, Math.ceil((A.end - Date.now()) / 1000));
+    $("aClock").textContent = left;
+    $("aBar").style.width = (left / 60 * 100) + "%";
+    if (left <= 0) { finishRead(); return; }
+    // Silencio > 3 s: el software modela la palabra por voz y la cuenta como vacilación
+    if (!A.speaking && A.p < 100 && Date.now() - Math.max(A.last, A.heard) >= 3000) {   // 3 s sin palabras NI voz detectada
+      const p = A.p;
+      A.st[p] = "vac";
+      if (A.vac === p) { A.p++; A.vac = -1; A.pend = null; A.last = Date.now(); }
+      else { A.vac = p; speak(WORDS[p].replace(/[.,]/g, ""), null, "w_" + TGT[p]); }
+      paint();
+    }
+  }
+
+  function finishRead() {
+    if (!A.reading) return;
+    A.flush = true; flushTail(); A.flush = false;
+    A.keepRec = true;
+    stopAll();
+    A.PI = A.p; // corte: última palabra alcanzada
+    paint();
+    setTimeout(qIntro, 1200);
+  }
+
+  function qIntro() {
+    if (!$("sc2").classList.contains("on")) return;
+    screen(3);
+    const tok = ++A.qtok;
+    A.Q = null; setStars(0, false);
+    renderStory(null);
+    $("qNum").textContent = "";
+    $("qTitle").textContent = "Ahora te haré cuatro preguntas";
+    $("qOpts").innerHTML = ""; $("qFeed").innerHTML = "";
+    $("btnRepeat").classList.add("hidden");
+    $("qStat").textContent = "Escucha con atención. Después terminamos.";
+    speak(QINTRO, () => { if (tok === A.qtok) showQ(0); });   // sin clave: la voz sintética dice «cuatro»
+  }
+
+  // ---- Utilidades del cuestionario ----
+  const escHtml = t => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const reduceMotion = () => DUA.calm || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const optBtn = id => document.querySelector('#qOpts .qopt[data-id="' + id + '"]');
+
+  // Pinta el cuento (una oración por línea). Si se indica un fragmento, lo envuelve en .resaltado-pista.
+  function renderStory(frag) {
+    const k = frag ? CUENTO.indexOf(frag) : -1;
+    const h = k > -1
+      ? escHtml(CUENTO.slice(0, k)) + '<span class="resaltado-pista" id="pistaTxt">' + escHtml(frag) + "</span>" + escHtml(CUENTO.slice(k + frag.length))
+      : escHtml(CUENTO);
+    $("storyTxt").innerHTML = "<p>" + h.replace(/\. /g, ".<br>") + "</p>";
+  }
+
+  function setStars(n, anim) {
+    A.stars = n; $("starNum").textContent = n;
+    const b = $("starBox"); b.classList.remove("bump");
+    if (anim && !reduceMotion()) { void b.offsetWidth; b.classList.add("bump"); }
+  }
+  function chime() { tone(880, 0.6, 0.12); setTimeout(() => tone(1175, 0.8, 0.12), 160); }   // campanita suave (respeta Modo Tranquilo)
+  function starRain() {
+    if (reduceMotion()) return;
+    const box = $("starRain"); box.innerHTML = "";
+    for (let k = 0; k < 16; k++) {
+      const s = document.createElement("span");
+      s.textContent = "⭐"; s.style.left = (Math.random() * 96) + "%";
+      s.style.animationDelay = (Math.random() * 0.8) + "s";
+      s.style.fontSize = (22 + Math.random() * 22) + "px";
+      box.appendChild(s);
+    }
+    setTimeout(() => { box.innerHTML = ""; }, 3300);
+  }
+  // Habla y espera al menos `ms` (por si el navegador no tiene voz) antes de continuar.
+  function speakMin(txt, ms, cb) {
+    const tok = A.qtok; let a = false, b = false;
+    const go = () => { if (a && b && tok === A.qtok) cb(); };
+    setTimeout(() => { b = true; go(); }, ms);
+    speak(txt, () => { a = true; go(); });
+  }
+
+  // ---- P · PROMPT: pregunta grande + audio + 3 opciones ----
+  function showQ(i) {
+    A.qi = i; const tok = ++A.qtok;
+    clearTimeout(A.idle); clearTimeout(A.nx);
+    screen(3);
+    const q = PREGUNTAS[i];
+    A.Q = { lvl: 0, done: false };          // lvl = nivel de ayuda alcanzado (0 = ninguna)
+    renderStory(null);
+    $("qNum").textContent = "Pregunta " + (i + 1) + " de " + PREGUNTAS.length;
+    $("qTitle").textContent = q.prompt;
+    $("qFeed").innerHTML = "";
+    $("qStat").textContent = "Escucha la pregunta y toca la respuesta que creas correcta.";
+    $("btnRepeat").classList.remove("hidden");
+    const box = $("qOpts"); box.innerHTML = "";
+    q.opciones.forEach(o => {                // orden fijo A-B-C: predecible para el estudiante
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "qopt"; b.dataset.id = o.id;
+      b.innerHTML = '<span class="let" aria-hidden="true">' + o.id + '</span><span class="otx"></span>';
+      b.querySelector(".otx").textContent = o.texto;
+      b.addEventListener("click", () => pick(o));
+      box.appendChild(b);
+    });
+    $("qTitle").focus({ preventScroll: true });
+    speak(q.prompt, () => { if (tok === A.qtok) armIdle(); });   // el reloj de duda empieza al terminar el audio
+  }
+  $("btnRepeat").addEventListener("click", () => {
+    if (!A.Q || A.Q.done) return;
+    clearTimeout(A.idle); const tok = A.qtok;
+    speak(PREGUNTAS[A.qi].prompt, () => { if (tok === A.qtok) armIdle(); });
+  });
+
+  // ---- E · EVALUATE: duda (> 6 s) o error escalan la ayuda ----
+  function armIdle() {
+    clearTimeout(A.idle);
+    if (!A.Q || A.Q.done) return;
+    const tok = A.qtok;
+    A.idle = setTimeout(() => { if (tok === A.qtok && A.Q && !A.Q.done) help(); }, IDLE_MS);
+  }
+
+  function pick(o) {
+    const Q = A.Q; if (!Q || Q.done) return;
+    clearTimeout(A.idle); stopSpeech();
+    if (o.correcta) { solved(); return; }
+    const b = optBtn(o.id);                                       // error: sacudida suave y más ayuda (aprendizaje sin error)
+    if (b && !reduceMotion()) { b.classList.remove("nudge"); void b.offsetWidth; b.classList.add("nudge"); }
+    help();
+  }
+
+  // Least-to-Most: 1 = pista visual en el texto · 2 = descarte parcial · 3 = modelo directo
+  function help() {
+    const q = PREGUNTAS[A.qi], Q = A.Q, tok = A.qtok;
+    clearTimeout(A.idle);
+    Q.lvl = Math.min(Q.lvl + 1, 3);
+    A.help[A.qi] = Math.max(A.help[A.qi] || 0, Q.lvl);
+    const again = () => { if (tok === A.qtok) armIdle(); };
+    if (Q.lvl === 1) {
+      renderStory(q.andamiaje.texto_resaltar);
+      const el = $("pistaTxt");
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: reduceMotion() ? "auto" : "smooth" });
+      $("qStat").textContent = "Pista: mira la parte amarilla del cuento.";
+      speak("Mira el cuento. La parte amarilla te ayuda a encontrar la respuesta.", again);
+    } else if (Q.lvl === 2) {
+      const b = optBtn(q.andamiaje.descarte_id);
+      if (b) { b.disabled = true; b.classList.add("dim"); b.setAttribute("aria-disabled", "true"); }
+      $("qStat").textContent = "Pista: quitamos una opción que no es.";
+      speak(q.andamiaje.pista_voz, again);
+    } else {
+      const c = q.opciones.find(o => o.correcta), b = optBtn(c.id);
+      if (b) b.classList.add("modelo");
+      $("qStat").textContent = q.andamiaje.modelo_voz;
+      speak("La respuesta correcta es " + c.texto + ". Selecciónala en tu pantalla.", again);
+    }
+  }
+
+  // ---- E · EXPAND  →  P · PRAISE ----
+  function solved() {
+    const i = A.qi, q = PREGUNTAS[i], Q = A.Q, tok = A.qtok;
+    Q.done = true; clearTimeout(A.idle); clearTimeout(A.nx);
+    const first = Q.lvl === 0;               // acierto inmediato, sin ninguna ayuda
+    A.ans[i] = first;
+    const gain = first ? 2 : 1;              // 2 estrellas al primer intento; 1 si necesitó ayuda (siempre se premia el logro)
+    const okId = q.opciones.find(o => o.correcta).id;
+    document.querySelectorAll("#qOpts .qopt").forEach(b => {
+      b.disabled = true; b.classList.remove("modelo");
+      if (b.dataset.id === okId) b.classList.add("ok");
+    });
+    $("btnRepeat").classList.add("hidden");
+    $("qStat").textContent = "";
+    setStars(A.stars + gain, true);
+    chime();
+
+    A.nx = setTimeout(() => {
+      if (tok !== A.qtok) return;
+      const ex = document.createElement("p"); ex.className = "exp"; ex.textContent = q.expansion;
+      $("qFeed").appendChild(ex);
+      speakMin(q.expansion, 1500, () => {                                   // Expand
+        const pr = document.createElement("p"); pr.className = "pra";
+        pr.textContent = "⭐".repeat(gain) + " " + q.elogio;
+        $("qFeed").appendChild(pr);
+        starRain();
+        speakMin(q.elogio, 2200, () => {                                   // Praise
+          A.nx = setTimeout(() => {
+            if (tok !== A.qtok) return;
+            if (i < PREGUNTAS.length - 1) showQ(i + 1); else finishMission();
+          }, 600);
+        });
+      });
+    }, 700);
+  }
+
+  // ---- Pantalla 4: cierre para el alumno (sin resultados). El informe queda solo en el Modo Evaluador. ----
+  function finishMission() {
+    const PI = A.PI, c = { err: [], omi: [], vac: [] };
+    for (let i = 0; i < PI; i++) { const k = A.st[i]; if (c[k]) c[k].push(WORDS[i].replace(/[.,]/g, "") + " (" + (i + 1) + ")"); }
+    const E = c.err.length + c.omi.length + c.vac.length, PCPM = Math.max(PI - E, 0), accRaw = PI > 0 ? PCPM / PI * 100 : 0;
+    const cl = PI > 0 ? classify(accRaw, A.ans.every(v => v === true)) : null;   // Nivel 3 exige las 4 al primer intento
+    A.rep = { PI, E, PCPM, acc: Math.round(accRaw * 10) / 10, c, ans: A.ans.slice(), help: A.help.slice(), stars: A.stars, cl, date: new Date().toLocaleString("es-PE") };
+    renderReport();
+    $("btnSaveStu").disabled = !cl;                 // sin lectura detectada no hay perfil que guardar
+    setMsg($("saveStuMsg"), "");
+    $("finStars").textContent = A.stars; $("finMax").textContent = PREGUNTAS.length * 2; setMsg($("storyMsg"), "");
+    A.celebrating = true; screen(4); confetti();
+    $("taskBox").classList.add("hidden");
+    speak("¡Muy bien! ¡Terminamos la misión!", () => {
+      if (!$("sc4").classList.contains("on")) return;
+      $("taskBox").classList.remove("hidden");
+      speak(TAREA, null, "tarea");
+    }, "final");
+  }
+
+  function confetti() {
+    if (DUA.calm) return;                           // Modo Tranquilo: sin confeti
+    if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const cv = $("confetti"), cx = cv.getContext("2d");
+    cv.width = innerWidth; cv.height = innerHeight; cv.style.display = "block";
+    const cols = ["#F2B63D", "#4FA3C7", "#E53935", "#43A047", "#8E5CC8", "#FF8A65"];
+    const ps = Array.from({ length: 170 }, () => ({
+      x: Math.random() * cv.width, y: -Math.random() * cv.height, w: 6 + Math.random() * 8, h: 10 + Math.random() * 10,
+      vy: 2 + Math.random() * 4, vx: -1.5 + Math.random() * 3, r: Math.random() * 6, vr: -0.2 + Math.random() * 0.4,
+      c: cols[Math.random() * cols.length | 0]
+    }));
+    const t0 = performance.now();
+    (function f(t) {
+      cx.clearRect(0, 0, cv.width, cv.height);
+      ps.forEach(q => { q.x += q.vx; q.y += q.vy; q.r += q.vr; cx.save(); cx.translate(q.x, q.y); cx.rotate(q.r); cx.fillStyle = q.c; cx.fillRect(-q.w / 2, -q.h / 2, q.w, q.h); cx.restore(); });
+      if (t - t0 < 7000 && A.celebrating) requestAnimationFrame(f);
+      else { cx.clearRect(0, 0, cv.width, cv.height); cv.style.display = "none"; }
+    })(t0);
+  }
+
+  // =====================================================================
+  // H. INFORME PARA EL EVALUADOR (pantalla, correo y PDF)
+  // =====================================================================
+  function renderReport() {
+    const r = A.rep; if (!r) return;
+    $("repEmpty").classList.add("hidden"); $("repBody").classList.remove("hidden");
+    $("rPI").textContent = r.PI; $("rE").textContent = r.E; $("rPCPM").textContent = r.PCPM; $("rAcc").textContent = r.acc + "%";
+    const box = $("aResult");
+    if (r.cl) { box.className = r.cl.cls; box.innerHTML = r.cl.html; }
+    else { box.className = ""; box.innerHTML = "<h4>No se detectó lectura</h4><p>Revisa el micrófono y repite la evaluación.</p>"; }
+    $("btnSaveAuto").disabled = !r.cl;
+    $("btnRec").classList.toggle("hidden", !A.blob);
+  }
+
+  function reportLines() {
+    const r = A.rep, nm = $("stuName").value.trim(), yn = v => v === true ? "Correcta" : "Incorrecta";
+    return [
+      "Evaluación diagnóstica de lectura - El rescate del gatito",
+      "Estudiante: " + (nm || "(sin nombre)"), "Fecha: " + r.date, "",
+      "Palabras Intentadas (PI): " + r.PI,
+      "E: " + r.E,
+      "  Sustituciones / mala pronunciación: " + r.c.err.length,
+      "  Omisiones: " + r.c.omi.length,
+      "  Vacilaciones > 3 s: " + r.c.vac.length,
+      "PCPM (PI - E): " + r.PCPM,
+      "Precisión: " + r.acc + "%", "",
+      ...PREGUNTAS.map((q, i) => "Comprensión " + (i + 1) + " (" + q.tipo + ") al primer intento: " + yn(r.ans[i]) + " · nivel de ayuda: " + r.help[i]),
+      "Estrellas: " + r.stars + " de " + (PREGUNTAS.length * 2), "",
+      "Clasificación: " + (r.cl ? r.cl.t : "No se detectó lectura"),
+      r.cl ? r.cl.m : "", "",
+      "Errores: " + (r.c.err.join(", ") || "ninguno"),
+      "Omisiones: " + (r.c.omi.join(", ") || "ninguna"),
+      "Vacilaciones: " + (r.c.vac.join(", ") || "ninguna"), "",
+      "Diseño y Adaptación Psicoeducativa: Psicólogo José M. Granda Cortez"
+    ];
+  }
+
+  // <PDF-BEGIN> ------------------------------------------------------------
+  // Generador de PDF 100 % manual (sin librerías): una página A4 con marco
+  // decorativo, tabla de métricas, árbol de decisión y firma del autor.
+  // Usa las fuentes estándar Helvetica / Helvetica-Bold / Helvetica-Oblique.
+  // ------------------------------------------------------------------------
+
+  // Anchos de glifo (unidades/1000) de Helvetica, caracteres ASCII 32-126.
+  // Sirven para centrar, alinear y ajustar el texto dentro de las cajas.
+  const HW = [
+    278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,        // espacio ! " # $ % & ' ( ) * + , - . /
+    556,556,556,556,556,556,556,556,556,556,                                  // 0-9
+    278,278,584,584,584,556,1015,                                             // : ; < = > ? @
+    667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611, // A-Z
+    278,278,278,469,556,333,                                                  // [ \ ] ^ _ `
+    556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500, // a-z
+    334,260,334,584                                                           // { | } ~
+  ];
+  const HB = [                                                                // Helvetica-Bold
+    278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,
+    556,556,556,556,556,556,556,556,556,556,
+    333,333,584,584,584,611,975,
+    722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,
+    333,278,333,584,556,333,
+    556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,
+    389,280,389,584
+  ];
+
+  // Ancho aproximado de un texto en puntos (las vocales acentuadas y la ñ usan el ancho de su letra base)
+  function pdfW(s, size, bold) {
+    const T = bold ? HB : HW; let w = 0;
+    for (const ch of s) {
+      let c = ch.charCodeAt(0);
+      if (c < 32 || c > 126) { c = ch.normalize("NFD").charCodeAt(0); if (c < 32 || c > 126) c = 97; }
+      w += T[c - 32];
+    }
+    return w * size / 1000;
+  }
+  // Parte un texto en renglones que caben en maxW
+  function pdfWrap(s, maxW, size, bold) {
+    const out = []; let cur = "";
+    s.split(" ").forEach(w => {
+      const t = cur ? cur + " " + w : w;
+      if (cur && pdfW(t, size, bold) > maxW) { out.push(cur); cur = w; } else cur = t;
+    });
+    if (cur) out.push(cur);
+    return out;
+  }
+  // Limita a «k» renglones, cerrando con «...» si el texto no cabe
+  function pdfCap(lines, k, maxW, size, bold) {
+    if (lines.length <= k) return lines;
+    const r = lines.slice(0, k); let last = r[k - 1];
+    while (last && pdfW(last + " ...", size, bold) > maxW) last = last.slice(0, -1);
+    r[k - 1] = last + " ...";
+    return r;
+  }
+  // Recorta una sola línea para que quepa en maxW
+  function pdfFit(s, maxW, size, bold) {
+    if (pdfW(s, size, bold) <= maxW) return s;
+    while (s && pdfW(s + "...", size, bold) > maxW) s = s.slice(0, -1);
+    return s + "...";
+  }
+
+  // d = { name, date, PI, E, PCPM, acc, c:{err,omi,vac}, ans:[..], cl }
+  function makePDF(d) {
+    // Paleta del informe
+    const BLUE = "#2F5D8C", GOLD = "#D9A53D", INK = "#1F2933", MUTED = "#5B6773", LINE = "#B8C4D0", PALE = "#F4F7FA", WHITE = "#FFFFFF";
+
+    // Texto seguro para WinAnsi: convierte comillas/guiones tipográficos y elimina emojis y símbolos fuera de Latin-1
+    const clean = t => String(t).replace(/[“”«»]/g, '"').replace(/[‘’]/g, "'").replace(/[–—−]/g, "-").replace(/…/g, "...").replace(/[^\x20-\xFF]/g, "");
+    const esc = t => t.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+    const rgb = h => [1, 3, 5].map(i => (parseInt(h.substr(i, 2), 16) / 255).toFixed(3)).join(" ");
+
+    let c = ""; // contenido de la página (operadores gráficos de PDF)
+
+    // Rectángulo con relleno y/o borde
+    const rect = (x, y, w, h, fill, stroke, lw) => {
+      c += "q " + (fill ? rgb(fill) + " rg " : "") + (stroke ? rgb(stroke) + " RG " + (lw || 1) + " w " : "") +
+           x + " " + y + " " + w + " " + h + " re " + (fill && stroke ? "B" : fill ? "f" : "S") + " Q\n";
+    };
+    // Línea recta
+    const ln = (x1, y1, x2, y2, stroke, lw) => {
+      c += "q " + rgb(stroke) + " RG " + lw + " w " + x1 + " " + y1 + " m " + x2 + " " + y2 + " l S Q\n";
+    };
+    // Rombo decorativo
+    const dia = (x, y, s, fill, stroke) => {
+      c += "q " + rgb(fill) + " rg " + rgb(stroke) + " RG 1 w " + (x - s) + " " + y + " m " + x + " " + (y + s) + " l " +
+           (x + s) + " " + y + " l " + x + " " + (y - s) + " l h B Q\n";
+    };
+    // Texto. font: 1 = regular, 2 = negrita, 3 = cursiva. align: "l" | "c" | "r"
+    const tx = (s, x, y, size, font, color, align) => {
+      s = clean(s);
+      const w = pdfW(s, size, font === 2);
+      const px = align === "c" ? x - w / 2 : align === "r" ? x - w : x;
+      c += "BT /F" + font + " " + size + " Tf " + rgb(color) + " rg " + px.toFixed(2) + " " + y + " Td (" + esc(s) + ") Tj ET\n";
+    };
+    // Título de sección con subrayado dorado
+    const sec = (t, y) => { tx(t, 50, y, 12.5, 2, BLUE); ln(50, y - 5, 545, y - 5, GOLD, 1.2); };
+
+    const CX = 297.5; // centro horizontal de la página A4 (595 pt)
+
+    // ---- Marco decorativo doble + rombos en esquinas y puntos medios ----
+    rect(22, 22, 551, 798, null, BLUE, 4);
+    rect(30, 30, 535, 782, null, GOLD, 1.2);
+    [[30, 30], [565, 30], [30, 812], [565, 812]].forEach(p => dia(p[0], p[1], 8, GOLD, BLUE));
+    [[CX, 30], [CX, 812]].forEach(p => dia(p[0], p[1], 4, BLUE, GOLD));
+
+    // ---- Cabecera ----
+    rect(38, 724, 519, 80, BLUE);
+    rect(38, 720, 519, 4, GOLD);
+    tx("INFORME DE LECTURA", CX, 780, 22, 2, WHITE, "c");
+    tx("Protocolo de Ubicación Diagnóstica Virtual en 5 Minutos", CX, 758, 12, 2, WHITE, "c");
+    tx("Lectura evaluada: El rescate del gatito", CX, 738, 10.5, 3, "#FDE9B0", "c");
+
+    // ---- Datos del estudiante ----
+    rect(50, 656, 495, 50, PALE, LINE, 0.8);
+    tx("Estudiante:", 62, 687, 10.5, 2, BLUE);
+    tx(pdfFit(clean(d.name || "(sin nombre)"), 390, 10.5, false), 140, 687, 10.5, 1, INK);
+    tx("Fecha:", 62, 667, 10.5, 2, BLUE);
+    tx(pdfFit(clean(d.date), 390, 10.5, false), 140, 667, 10.5, 1, INK);
+
+    // ---- 1. Tabla de métricas (PI, E, PCPM, % Precisión) ----
+    sec("1. Métricas de fluidez lectora", 636);
+    rect(50, 602, 495, 22, BLUE, BLUE, 0.6);
+    tx("Indicador", 58, 609, 10, 2, WHITE);
+    tx("Valor", 265, 609, 10, 2, WHITE, "c");
+    tx("Descripción", 313, 609, 10, 2, WHITE);
+    const rows = [
+      ["PI · Palabras Intentadas", String(d.PI), "Palabras alcanzadas hasta el corte de 60 s"],
+      ["E · Errores", String(d.E), "Sustituciones, omisiones y vacilaciones"],
+      ["PCPM · Palabras correctas", String(d.PCPM), "Palabras correctas por minuto (PI - E)"],
+      ["% Precisión", d.acc + "%", "(PCPM / PI) x 100"]
+    ];
+    rows.forEach((r, i) => {
+      const y = 602 - (i + 1) * 24;
+      rect(50, y, 495, 24, i % 2 ? PALE : WHITE, LINE, 0.6);
+      ln(225, y, 225, y + 24, LINE, 0.6);
+      ln(305, y, 305, y + 24, LINE, 0.6);
+      tx(pdfFit(r[0], 160, 10, true), 58, y + 8, 10, 2, INK);
+      tx(r[1], 265, y + 7, 13, 2, BLUE, "c");
+      tx(pdfFit(r[2], 226, 9, false), 313, y + 8, 9, 1, MUTED);
+    });
+    tx(pdfFit("Desglose de E:  sustituciones / mala pronunciación: " + d.c.err.length + "  ·  omisiones: " + d.c.omi.length + "  ·  vacilaciones > 3 s: " + d.c.vac.length, 495, 9, false), 50, 490, 9, 1, INK);
+    const yn = v => v === true ? "Correcta" : "Incorrecta";
+    tx(pdfFit("Comprensión (1.er intento):  " + PREGUNTAS.map((q, i) => "P" + (i + 1) + " " + yn(d.ans[i])).join("  ·  ") + "  ·  Estrellas: " + d.stars, 495, 9, false), 50, 475, 9, 1, INK);
+
+    // ---- 2. Árbol de decisión: se resalta el nodo que corresponde al alumno ----
+    sec("2. Resultado del árbol de decisión", 446);
+    const nodes = [
+      { k: "r1", t: "NIVEL 1 · EXPLORADOR", s: ["Precisión menor a 85%", "(nivel de frustración)"],        col: "#C62828", txt: WHITE, tint: "#FDECEA", ink: "#C62828" },
+      { k: "r2", t: "NIVEL 2 · DETECTIVE",  s: ["Precisión de 85% a 95%", "o > 95% sin comprensión 2/2"],    col: "#E0A800", txt: INK,   tint: "#FFF6D6", ink: "#7A5A00" },
+      { k: "r3", t: "NIVEL 3 · CAZADOR",    s: ["Precisión mayor a 95% y", "2 de 2 preguntas correctas"],    col: "#2E7D32", txt: WHITE, tint: "#E6F4E7", ink: "#2E7D32" }
+    ];
+    let chosen = null;
+    nodes.forEach((nd, i) => {
+      const x = 50 + i * 170, y = 352, w = 155, h = 72, sel = !!(d.cl && d.cl.cls === nd.k);
+      if (sel) chosen = nd;
+      rect(x, y, w, h, sel ? nd.col : WHITE, sel ? nd.col : LINE, sel ? 2.5 : 0.8);
+      tx(nd.t, x + w / 2, y + h - 22, 9.5, 2, sel ? nd.txt : INK, "c");
+      tx(nd.s[0], x + w / 2, y + h - 40, 8, 1, sel ? nd.txt : MUTED, "c");
+      tx(nd.s[1], x + w / 2, y + h - 52, 8, 1, sel ? nd.txt : MUTED, "c");
+      if (sel) {                                  // etiqueta «RESULTADO» sobre el nodo elegido
+        rect(x + w / 2 - 38, y + h, 76, 13, INK, INK, 1);
+        tx("RESULTADO", x + w / 2, y + h + 4, 7.5, 2, WHITE, "c");
+      }
+    });
+
+    // Conclusión del árbol
+    const tint = chosen ? chosen.tint : PALE, edge = chosen ? chosen.col : LINE, ink = chosen ? chosen.ink : INK;
+    rect(50, 272, 495, 68, tint, edge, 2);
+    tx(chosen ? "Perfil asignado: " + d.cl.perfil.toUpperCase() : "Sin perfil: no se detectó lectura", 62, 322, 14, 2, ink);
+    const msg = chosen ? d.cl.m : "Revisa el micrófono y repite la evaluación.";
+    pdfCap(pdfWrap(clean(msg), 471, 9.5, false), 3, 471, 9.5, false).forEach((l, i) => tx(l, 62, 305 - i * 12, 9.5, 1, INK));
+
+    // ---- 3. Detalle de palabras marcadas ----
+    sec("3. Detalle de la lectura", 252);
+    const det = [
+      ["Errores / mala pronunciación", d.c.err, "#C62828"],
+      ["Omisiones", d.c.omi, "#B26A00"],
+      ["Vacilaciones > 3 s", d.c.vac, "#8A6D00"]
+    ];
+    let yy = 232;
+    det.forEach(([lab, arr, colr]) => {
+      tx(lab + " (" + arr.length + ")", 50, yy, 9.5, 2, colr);
+      const ls = pdfCap(pdfWrap(clean(arr.length ? arr.join(", ") : "ninguna"), 495, 9, false), 2, 495, 9, false);
+      ls.forEach((l, i) => tx(l, 50, yy - 12 - i * 11, 9, 1, INK));
+      yy -= 12 + 11 * ls.length + 9;
+    });
+
+    // ---- Firma y créditos ----
+    ln(60, 112, 270, 112, GOLD, 1); ln(325, 112, 535, 112, GOLD, 1);
+    dia(CX, 112, 5, GOLD, BLUE);
+    tx("Diseño y Adaptación Psicoeducativa: Psicólogo José M. Granda Cortez", CX, 94, 10, 2, BLUE, "c");
+    tx("Protocolo de Ubicación Diagnóstica Virtual en 5 Minutos  ·  Informe generado el " + d.date, CX, 78, 7.5, 1, MUTED, "c");
+    tx("Este informe es un apoyo para la decisión del evaluador y no sustituye una evaluación psicopedagógica completa.", CX, 66, 7.5, 3, MUTED, "c");
+
+    // ---- Ensamblado del archivo PDF ----
+    const meta = s => "(" + esc(clean(s)) + ")";
+    const objs = [
+      "<</Type/Catalog/Pages 2 0 R>>",
+      "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+      "<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]/Contents 4 0 R/Resources<</Font<</F1 5 0 R/F2 6 0 R/F3 7 0 R>>>>>>",
+      "<</Length " + c.length + ">>\nstream\n" + c + "\nendstream",
+      "<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>",
+      "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>",
+      "<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Oblique/Encoding/WinAnsiEncoding>>",
+      "<</Title" + meta("Informe de lectura - El rescate del gatito") + "/Author" + meta("Psicólogo José M. Granda Cortez") +
+        "/Creator" + meta("Protocolo de Ubicación Diagnóstica Virtual en 5 Minutos") + ">>"
+    ];
+    let out = "%PDF-1.4\n"; const off = [];
+    objs.forEach((o, i) => { off.push(out.length); out += (i + 1) + " 0 obj\n" + o + "\nendobj\n"; });
+    const x = out.length;
+    out += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n" + off.map(o => String(o).padStart(10, "0") + " 00000 n \n").join("") +
+      "trailer\n<</Size " + (objs.length + 1) + "/Root 1 0 R/Info 8 0 R>>\nstartxref\n" + x + "\n%%EOF";
+    const b = new Uint8Array(out.length);
+    for (let i = 0; i < out.length; i++) b[i] = out.charCodeAt(i) & 255;
+    return new Blob([b], { type: "application/pdf" });
+  }
+  // <PDF-END> --------------------------------------------------------------
+
+  function download(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  const fileBase = () => "Lectura_" + ($("stuName").value.trim() || "estudiante").replace(/\W+/g, "_");
+  $("btnPdf").addEventListener("click", () => {
+    if (A.rep) download(makePDF(Object.assign({}, A.rep, { name: $("stuName").value.trim() })), fileBase() + ".pdf");
+  });
+  $("btnRec").addEventListener("click", () => { if (A.blob) download(A.blob, fileBase() + "_voz.webm"); });
+  $("btnMail").addEventListener("click", () => {
+    if (!A.rep) return;
+    const subj = "Resultado de lectura - " + ($("stuName").value.trim() || "estudiante");
+    location.href = "mailto:" + encodeURIComponent($("evalMail").value.trim()).replace(/%40/g, "@") + "?subject=" + encodeURIComponent(subj) + "&body=" + encodeURIComponent(reportLines().join("\n"));
+  });
+
+  // =====================================================================
+  // I. REINICIO E INICIALIZACIÓN
+  // =====================================================================
+  function resetAuto(keep) {
+    stopAll();
+    A.st = []; A.p = 0; A.PI = 0; A.vac = -1; A.qi = 0; A.ans = PREGUNTAS.map(() => null); A.help = PREGUNTAS.map(() => 0); A.stars = 0; A.Q = null; A.micOk = false; A.micErr = false;
+    $("aClock").textContent = "60"; $("aBar").style.width = "100%";
+    $("aReady").classList.remove("hidden"); $("aRun").classList.add("hidden");
+    $("stepWords").classList.add("hidden"); $("btnReady").disabled = true; $("taskBox").classList.add("hidden");
+    micMsg("🎤 Micrófono sin probar"); $("btnGo").disabled = true;
+    setMsg($("saveStuMsg"), ""); setMsg($("saveAutoMsg"), ""); $("btnSaveStu").disabled = false;
+    if (!keep) {
+      A.rep = null; A.blob = null;
+      $("repEmpty").classList.remove("hidden"); $("repBody").classList.add("hidden");
+    }
+    screen(0);
+  }
+  $("btnToEval").addEventListener("click", () => setView("eval"));
+  // Paso a la siguiente fase (Story Mapping): avisa por evento y navega si hay URL configurada
+  $("btnStory").addEventListener("click", () => {
+    document.dispatchEvent(new CustomEvent("peep:completado", { detail: { estrellas: A.stars, primerIntento: A.ans.slice(), ayudas: A.help.slice() } }));
+    if (STORY_MAPPING_URL) location.href = STORY_MAPPING_URL;
+    else setMsg($("storyMsg"), "La fase de Story Mapping aún no está conectada (configura STORY_MAPPING_URL).", false);
+  });
+  $("btnHear").addEventListener("click", () => speak(WELCOME, null, "bienvenida"));
+  $("btnInd").addEventListener("click", () => { screen(1); speak(MICTXT, null, "microfono"); });
+
+  applyDua(false);            // restaura tamaño de letra, fondo y Modo Tranquilo guardados
+  drawClock(); calc(); resetAuto();
+})();
+</script>
+</body>
+</html>
